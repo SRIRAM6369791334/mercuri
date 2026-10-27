@@ -21,4 +21,6 @@ mercuri.zip
 *.zip
 error_log
 /tmp
+clean_dump.sql
+
 
