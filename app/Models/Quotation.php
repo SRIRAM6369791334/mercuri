@@ -9,7 +9,7 @@ class Quotation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['id_lead', 'quota_id', 'basic_total', 'allow_dis', 'req_dis', 'reqdis_amt','id_customer', 'subtotal', 'tax_total','grand_total','products', 'categorys', 'ga_number', 'quantitys', 'dis_app','quto_app','disremark','revised_discount',
+    protected $fillable = ['id_lead', 'quota_id', 'basic_total', 'allow_dis', 'req_dis', 'reqdis_amt','id_customer', 'subtotal', 'tax_total','grand_total','products', 'categorys', 'ga_number', 'pit_drawing', 'quantitys', 'dis_app','quto_app','disremark','revised_discount',
     'freight_approval',
     'same_as_billing_address',
 

@@ -87,7 +87,7 @@
                                 <th>Supplier Rate</th>
                                 <th>Total</th>
                                 <th>Status</th>
-                                <th>Invoice</th>
+                                <th>PO Document</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -115,7 +115,7 @@
                                     <td>{{ $data->allVendorDetails?->company_name ?? "N/A" }}</td>
                                     <td style="text-align: left; max-width: 180px;">
                                         <div class="text-truncate" title="{{ $data->productDetails?->productname ?? 'N/A' }}">
-                                            {{ $data->productDetails?->productname ?? "N/A" }}
+                                            {{ $data->productDetails?->productmodel ?: ($data->productDetails?->productname ?? "N/A") }}
                                         </div>
                                     </td>
                                     <td>
@@ -131,6 +131,14 @@
                                         <span class="badge" style="background:#28a745;color:white;padding:5px 8px;border-radius:4px;font-size:11px;">
                                             <i class="fas fa-check-circle"></i> Released
                                         </span>
+                                        @php
+                                            $poAgeDays = $data->created_at ? (int) \Carbon\Carbon::parse($data->created_at)->startOfDay()->diffInDays(now()->startOfDay()) : 0;
+                                        @endphp
+                                        <div class="mt-1">
+                                            <small class="text-muted" style="font-size:10px;">
+                                                <i class="fas fa-clock me-1"></i>{{ $poAgeDays == 0 ? 'Today' : ($poAgeDays . ' ' . \Illuminate\Support\Str::plural('day', $poAgeDays) . ' ago') }}
+                                            </small>
+                                        </div>
                                     </td>
                                     <td>
                                         <div class="d-flex align-items-center justify-content-center gap-1">
@@ -153,8 +161,10 @@
                                                     </a>
                                                 @endcan
                                                 @can('purchase-order-delete')
-                                                    <button class="btn btn-danger btn-sm common-delete-btn" style="padding:3px 8px;font-size:12px;"
-                                                        data-url="/po-delete/{{ $data->id }}">Delete</button>
+                                                    <form method="POST" action="/po-delete/{{ $data->id }}" onsubmit="return confirm('Delete this draft or cancel this progressed PO?');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:12px;">Delete / Cancel</button>
+                                                    </form>
                                                 @endcan
                                             </div>
                                         </td>

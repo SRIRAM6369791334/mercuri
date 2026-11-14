@@ -75,15 +75,17 @@ Route::get('getProductData/{id?}', [DashboardControllerApi::class, 'getProductDa
 Route::get('getCustomerData/{id?}', [DashboardControllerApi::class, 'getCustomerData']);
 Route::get('getTermData/{id?}', [DashboardControllerApi::class, 'getTermData']);
 Route::get('getRoles', [DashboardControllerApi::class, 'getRoles']);
-Route::post('updateUser/{id}', [DashboardControllerApi::class, 'updateUser']);
-Route::post('updateProductCategory', [DashboardControllerApi::class, 'updateProductCategory']);
-Route::post('updateProductData', [DashboardControllerApi::class, 'updateProductData']);
-Route::post('updateCustomerData', [DashboardControllerApi::class, 'updateCustomerData']);
-Route::post('updateTermData', [DashboardControllerApi::class, 'updateTermData']);
-Route::post('updateTermApprovalStatus', [DashboardControllerApi::class, 'updateTermApprovalStatus']);
-Route::post('deleteTerm', [DashboardControllerApi::class, 'deleteTerm']);
-Route::post('deleteCustomer', [DashboardControllerApi::class, 'deleteCustomer']);
-Route::post('deleteProducts', [DashboardControllerApi::class, 'deleteProducts']);
-Route::post('deleteProductsCategories', [DashboardControllerApi::class, 'deleteProducts14Categories']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('updateUser/{id}', [DashboardControllerApi::class, 'updateUser']);
+    Route::post('updateProductCategory', [DashboardControllerApi::class, 'updateProductCategory']);
+    Route::post('updateProductData', [DashboardControllerApi::class, 'updateProductData']);
+    Route::post('updateCustomerData', [DashboardControllerApi::class, 'updateCustomerData']);
+    Route::post('updateTermData', [DashboardControllerApi::class, 'updateTermData']);
+    Route::post('updateTermApprovalStatus', [DashboardControllerApi::class, 'updateTermApprovalStatus']);
+    Route::post('deleteTerm', [DashboardControllerApi::class, 'deleteTerm']);
+    Route::post('deleteCustomer', [DashboardControllerApi::class, 'deleteCustomer']);
+    Route::post('deleteProducts', [DashboardControllerApi::class, 'deleteProducts']);
+    Route::post('deleteProductsCategories', [DashboardControllerApi::class, 'deleteProductsCategories']);
+});
 
 // Route::get('Overduelist/{userId?}/{companyId?}',[HomeController::class,"Overduelist"]);

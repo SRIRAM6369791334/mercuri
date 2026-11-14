@@ -29,37 +29,56 @@ $.ajaxSetup({
 });
 
 $(document).on("change", ".state_list", function () {
-    fetchCitiesVendor($(this).val());
+    fetchCitiesVendor($(this).val(), null);
 });
 
-function fetchCitiesVendor(stateId) {
+function fetchCitiesVendor(stateId, selectedCity) {
     if (stateId) {
         $.ajax({
             url: "/get-cities/" + stateId,
             method: "GET",
             success: function (response) {
-                $("#addvendor_city_list")
-                    .empty()
-                    .append('<option value=""> -- Choose City -- </option>');
-                $("#edit_vendor_city_list")
-                    .empty()
-                    .append('<option value=""> -- Choose City -- </option>');
+                let $addCity = $("#addvendor_city_list");
+                let $editCity = $("#edit_vendor_city_list");
 
+                $addCity.empty().append('<option value=""> -- Choose City -- </option>');
+                $editCity.empty().append('<option value=""> -- Choose City -- </option>');
+
+                let foundSelected = null;
                 $.each(response, function (index, city) {
-                    $("#addvendor_city_list").append(
-                        `<option value="${city.id}">${city.city_name}</option>`
+                    let isSel = false;
+                    if (selectedCity) {
+                        if (city.id == selectedCity || String(city.id) === String(selectedCity)) {
+                            isSel = true;
+                            foundSelected = city.id;
+                        } else if (typeof selectedCity === 'string' && city.city_name && city.city_name.toLowerCase().trim() === selectedCity.toLowerCase().trim()) {
+                            isSel = true;
+                            foundSelected = city.id;
+                        }
+                    }
+                    $addCity.append(
+                        `<option value="${city.id}" ${isSel ? 'selected' : ''}>${city.city_name}</option>`
                     );
-                    $(".edit_vendor_city_list").append(
-                        `<option value="${city.id}">${city.city_name}</option>`
+                    $editCity.append(
+                        `<option value="${city.id}" ${isSel ? 'selected' : ''}>${city.city_name}</option>`
                     );
                 });
+
+                if (foundSelected) {
+                    $addCity.val(String(foundSelected));
+                    $editCity.val(String(foundSelected));
+                }
+
+                $addCity.trigger('change');
+                $editCity.trigger('change');
             },
             error: function () {
-                alert("Unable to fetch cities.");
+                // Silently ignore or handle
             },
         });
     }
 }
+window.fetchCitiesVendor = fetchCitiesVendor;
 
 $(document).on("click", ".po-remove-btn", function () {
     $(this).closest(".po-form-box").remove();
@@ -1190,11 +1209,23 @@ function gstValidationFunction(thisKeyWord) {
                     $("#company_name").val(localRes.customername || "");
                     $("#vendor-address").val(localRes.address || "");
                     $("#add-vendor-postalcode").val(localRes.postalcode || "");
+                    if (localRes.state && $("#addvendor_state_list").length) {
+                        $("#addvendor_state_list").val(String(localRes.state)).trigger("change");
+                        if (typeof window.fetchCitiesVendor === "function") {
+                            window.fetchCitiesVendor(localRes.state, localRes.city);
+                        }
+                    }
                 }
                 if ($("#edit_company_name").length) {
                     $("#edit_company_name").val(localRes.customername || "");
                     $("#edit_vendor_address").val(localRes.address || "");
                     $("#edit_vendor_postalcode").val(localRes.postalcode || "");
+                    if (localRes.state && $("#edit_vendor_state_list").length) {
+                        $("#edit_vendor_state_list").val(String(localRes.state)).trigger("change");
+                        if (typeof window.fetchCitiesVendor === "function") {
+                            window.fetchCitiesVendor(localRes.state, localRes.city);
+                        }
+                    }
                 }
 
             } else {
@@ -1211,30 +1242,26 @@ function gstValidationFunction(thisKeyWord) {
 
 function fetchExternalGstApi(gstNumber, $this) {
     $.ajax({
-        url: "https://gst-return-status.p.rapidapi.com/free/gstin/" + encodeURIComponent(gstNumber),
+        url: "/api/get-addresses-by-gst/" + encodeURIComponent(gstNumber),
         method: "GET",
         async: true,
-        crossDomain: true,
         beforeSend: function () {
             $(".web-loader").hide();
         },
-        headers: {
-            "x-rapidapi-key": "f216e3cbefmsh74bb68190d526a5p1fcdb1jsn7712055aeb4a",
-            "x-rapidapi-host": "gst-return-status.p.rapidapi.com",
-        },
         success: function (response) {
-            if (response.success && response.data) {
+            let details = response && response.found ? response.primary_address : null;
+            if (response.status === "success" && details) {
                 $this.closest(".form-group").find(".gst-input-div i.fa-check-circle").show();
                 $this.closest(".form-group").find(".gst-input-div i.fa-times-circle").hide();
                 $this.closest(".form-group").find(".error-msg").text("");
 
-                let companyName = response.data.tradeName || response.data.lgnm || "";
-                let address = response.data.adr || "";
-                let pincode = response.data.pincode || "";
+                let companyName = details.company_name || "";
+                let address = details.raw_address || details.address || "";
+                let pincode = details.postalcode || "";
 
                 // Determine State from first 2 digits of GST
                 let statePrefix = gstNumber.substring(0, 2);
-                let stateId = gstStateCodeMap[statePrefix] || null;
+                let stateId = details.state_id || gstStateCodeMap[statePrefix] || null;
 
                 // 1. Lead Add Form
                 if ($("#lead_customerSelect").length) {
@@ -1281,24 +1308,36 @@ function fetchExternalGstApi(gstNumber, $this) {
                     $("#company_name").val(companyName);
                     $("#vendor-address").val(address);
                     $("#add-vendor-postalcode").val(pincode);
+                    if (stateId && $("#addvendor_state_list").length) {
+                        $("#addvendor_state_list").val(String(stateId)).trigger("change");
+                        if (typeof window.fetchCitiesVendor === "function") {
+                            window.fetchCitiesVendor(stateId, details ? (details.city_id || details.city_name) : null);
+                        }
+                    }
                 }
                 if ($("#edit_company_name").length) {
                     $("#edit_company_name").val(companyName);
                     $("#edit_vendor_address").val(address);
                     $("#edit_vendor_postalcode").val(pincode);
+                    if (stateId && $("#edit_vendor_state_list").length) {
+                        $("#edit_vendor_state_list").val(String(stateId)).trigger("change");
+                        if (typeof window.fetchCitiesVendor === "function") {
+                            window.fetchCitiesVendor(stateId, details ? (details.city_id || details.city_name) : null);
+                        }
+                    }
                 }
 
             } else {
                 $this.closest(".form-group").find(".gst-input-div i.fa-check-circle").hide();
                 $this.closest(".form-group").find(".gst-input-div i.fa-times-circle").show();
-                $this.closest(".form-group").find(".error-msg").text(response.message || "Invalid GST Number");
+                $this.closest(".form-group").find(".error-msg").text(response.message || "GST details not found");
             }
         },
         error: function (xhr, status, error) {
-            console.error("GST API Error:", error);
+            console.error("GST lookup error:", error);
             $this.closest(".form-group").find(".gst-input-div i.fa-check-circle").hide();
             $this.closest(".form-group").find(".gst-input-div i.fa-times-circle").show();
-            $this.closest(".form-group").find(".error-msg").text("Invalid GST Number or API limit reached");
+            $this.closest(".form-group").find(".error-msg").text("Unable to fetch GST details. Please try again.");
         }
     });
 }
@@ -1758,44 +1797,152 @@ document.getElementById('catepro').addEventListener('change', function () {
         }
 
         /* ===== Load Design Specifications ===== */
-        fetch(`/design-specs/${categoryId}/${type}`)
-            .then(res => res.json())
-            .then(specs => {
+        window.loadDesignSpecifications(categoryId, type, $('#lead_sub_category_id').val() || '');
+    }
+});
 
-                if (!Array.isArray(specs) || specs.length === 0) {
-                    return;
+window.loadDesignSpecifications = function (categoryId, type, subCategoryId) {
+    let wrapper = document.getElementById('specificationWrapper');
+    let designSpecField = document.getElementById('designSpecField');
+    if (!wrapper || !designSpecField) return;
+
+    if (!categoryId) {
+        wrapper.innerHTML = '';
+        designSpecField.style.display = 'none';
+        return;
+    }
+
+    let url = `/design-specs/${categoryId}/${type}` + (subCategoryId ? `?sub_category_id=${encodeURIComponent(subCategoryId)}` : '');
+
+    fetch(url)
+        .then(res => res.json())
+        .then(specs => {
+            wrapper.innerHTML = '';
+
+            if (!Array.isArray(specs) || specs.length === 0) {
+                designSpecField.style.display = 'none';
+                return;
+            }
+
+            designSpecField.style.display = 'block';
+
+            specs.forEach(spec => {
+                let specName = spec.spec_name ?? spec.specification ?? '';
+                let lower = specName.trim().toLowerCase();
+                let inputHtml = '';
+                let placeholder = spec.placeholder || `Enter ${specName}`;
+
+                if (spec.type === 'select' || lower === 'type') {
+                    let options = spec.options || ['Floor Mounted', 'Pit Mounted'];
+                    let optionsHtml = '<option value="">-- Choose Type --</option>';
+                    options.forEach(opt => {
+                        optionsHtml += `<option value="${opt}">${opt}</option>`;
+                    });
+                    inputHtml = `
+                        <select name="spec_values[]" class="form-select form-select-sm" required>
+                            ${optionsHtml}
+                        </select>
+                    `;
+                } else {
+                    inputHtml = `
+                        <input type="text"
+                               name="spec_values[]"
+                               class="form-control form-control-sm"
+                               placeholder="${placeholder}">
+                    `;
                 }
 
-                designSpecField.style.display = 'block';
-
-                specs.forEach(spec => {
-
-                    let specName = spec.spec_name ?? spec.specification ?? '';
-
-                    wrapper.insertAdjacentHTML('beforeend', `
-                        <div class="row mb-2">
-                            <div class="col-md-5">
-                                <input type="text"
-                                       class="form-control"
-                                       value="${specName}"
-                                       readonly>
-                                <input type="hidden"
-                                       name="spec_ids[]"
-                                       value="${spec.id}">
-                            </div>
-
-                            <div class="col-md-7">
-                                <input type="text"
-                                       name="spec_values[]"
-                                       class="form-control"
-                                       placeholder="Enter ${specName}">
-                            </div>
+                wrapper.insertAdjacentHTML('beforeend', `
+                    <div class="row g-2 mb-2 align-items-center spec-row">
+                        <div class="col-md-5">
+                            <input type="text"
+                                   name="spec_names[]"
+                                   class="form-control form-control-sm bg-light"
+                                   value="${specName}"
+                                   readonly>
+                            <input type="hidden"
+                                   name="spec_ids[]"
+                                   value="${spec.id}">
                         </div>
-                    `);
-                });
-            })
-            .catch(err => console.error('Spec fetch error:', err));
+                        <div class="col-md-7">
+                            ${inputHtml}
+                        </div>
+                    </div>
+                `);
+            });
+
+            // Add Extra / Safety Accessories dynamic section with '+' button
+            wrapper.insertAdjacentHTML('beforeend', `
+                <div class="mt-3 pt-2 border-top">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-bold text-secondary">
+                            <i class="bi bi-shield-check me-1"></i>Extra / Custom Specifications
+                        </span>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary py-1 px-2"
+                                id="addCustomSpecBtn"
+                                style="font-size: 11px;">
+                            <i class="bi bi-plus-lg me-1"></i> + Add More
+                        </button>
+                    </div>
+                    <div id="customSpecsContainer" class="d-flex flex-column gap-2"></div>
+                </div>
+            `);
+        })
+        .catch(err => console.error('Spec fetch error:', err));
+};
+
+// Listen to Product Group changes and reload matching design specifications
+$(document).on('change', '#lead_sub_category_id', function () {
+    let catSelect = document.getElementById('catepro');
+    if (!catSelect || !catSelect.value) return;
+
+    let selectedOption = catSelect.options[catSelect.selectedIndex];
+    let categoryId = catSelect.value;
+    let type = selectedOption ? selectedOption.getAttribute('data-type') : null;
+    let subCategory = selectedOption ? selectedOption.getAttribute('data-sub') : null;
+
+    if ((subCategory === 'special' || type === 'mhe') && ['mhe', 'rack', 'pallet'].includes(type)) {
+        let subCatId = $(this).val();
+        window.loadDesignSpecifications(categoryId, type, subCatId);
     }
+});
+
+// Dynamic specification addition & removal
+$(document).off('click', '#addCustomSpecBtn').on('click', '#addCustomSpecBtn', function () {
+    let container = $('#customSpecsContainer');
+    container.append(`
+        <div class="row g-2 align-items-center custom-spec-row">
+            <div class="col-md-5">
+                <input type="text"
+                       name="spec_names[]"
+                       class="form-control form-control-sm"
+                       placeholder="Specification Name"
+                       required>
+                <input type="hidden"
+                       name="spec_ids[]"
+                       value="custom">
+            </div>
+            <div class="col-md-6">
+                <input type="text"
+                       name="spec_values[]"
+                       class="form-control form-control-sm"
+                       placeholder="Specification Value"
+                       required>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button"
+                        class="btn btn-sm btn-outline-danger py-1 px-2 removeSpecRow"
+                        title="Remove">
+                    ✕
+                </button>
+            </div>
+        </div>
+    `);
+});
+
+$(document).off('click', '.removeSpecRow').on('click', '.removeSpecRow', function () {
+    $(this).closest('.custom-spec-row').remove();
 });
 
 

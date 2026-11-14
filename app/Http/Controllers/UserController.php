@@ -11,13 +11,21 @@ class UserController extends Controller
 {
     public function store(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'role' => 'required|string',
+            'userstatus' => 'required|string',
+            'password' => 'required|min:6',
+        ]);
+
         $isExist = User::where('email', $request->email)->first();
 
-        if($isExist){
-            return back()->with('info', 'Email already exist');
+        if ($isExist) {
+            return back()->with('error', 'The email "' . $request->email . '" is already registered. Please use a different email address.')->withInput();
         }
 
-        // Directly create the user without any validation
+        // Directly create the user
         $user = User::create([
             'name' => $request->name,
             'mobilenumber' => $request->mobilenumber,
@@ -29,32 +37,50 @@ class UserController extends Controller
         ]);
 
         // Assign role using Spatie (ensure the role exists in the form)
-        $user->assignRole($request->role);
-
-        $user->syncRoles([$request->role]);
+        if (Role::where('name', $request->role)->exists()) {
+            $user->assignRole($request->role);
+            $user->syncRoles([$request->role]);
+        }
 
         return redirect()->back()->with('success', 'User added successfully');
     }
 
     public function update(Request $request)
     {
-        // Directly create the user without any validation
+        $request->validate([
+            'id' => 'required|exists:users,id',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'type' => 'required|string',
+            'userstatus' => 'required|string',
+        ]);
+
         $user = User::findOrFail($request->id);
 
-    $user->name = $request->name;
-    $user->mobilenumber = $request->mobilenumber;
-    $user->email = $request->email;
-    $user->role = $request->type;
-    $user->userstatus = $request->userstatus;
-    $user->tl_id = $request->tl_id ?: null;
+        // Check if email already belongs to another user
+        $emailExists = User::where('email', $request->email)
+            ->where('id', '!=', $user->id)
+            ->exists();
 
+        if ($emailExists) {
+            return redirect()->back()->with('error', 'The email "' . $request->email . '" is already registered to another user. Please use a different email address.')->withInput();
+        }
 
-    $user->save();
+        $user->name = $request->name;
+        $user->mobilenumber = $request->mobilenumber;
+        $user->email = $request->email;
+        $user->role = $request->type;
+        $user->userstatus = $request->userstatus;
+        $user->tl_id = $request->tl_id ?: null;
 
-    // Sync roles using Spatie
-    $user->syncRoles([$request->type]);
+        $user->save();
 
-    return redirect()->back()->with('success', 'User updated successfully.');
+        // Sync roles using Spatie (ensure role exists)
+        if (Role::where('name', $request->type)->exists()) {
+            $user->syncRoles([$request->type]);
+        }
+
+        return redirect()->back()->with('success', 'User updated successfully.');
     }
 
     public function updatePassword(Request $request)

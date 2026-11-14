@@ -127,6 +127,21 @@ select:disabled {
 .select2.is-invalid .select2-selection {
     border-color: #dc3545 !important;
 }
+.btn-group .btn-check:checked + .btn-outline-primary {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+    color: #fff !important;
+}
+.btn-group .btn-check:checked + .btn-outline-secondary {
+    background-color: #64748b !important;
+    border-color: #64748b !important;
+    color: #fff !important;
+}
+.btn-group .btn-outline-primary,
+.btn-group .btn-outline-secondary {
+    font-size: 11.5px;
+    font-weight: 600;
+}
 /* .productSelect .select2-selection__rendered {
     width:280px;
 } */
@@ -189,7 +204,7 @@ select:disabled {
 
             </div>
 
-            <form method="POST" action="{{ route('createestimate') }}" id="create-quotation-form" novalidate autocomplete="off" data-form-type="other" data-lpignore="true">
+            <form method="POST" action="{{ route('createestimate') }}" id="create-quotation-form" enctype="multipart/form-data" novalidate autocomplete="off" data-form-type="other" data-lpignore="true">
                 @csrf
 
                 <ul class="nav nav-tabs" id="myTab" role="tablist">
@@ -217,7 +232,9 @@ select:disabled {
                             <div class="col-lg-3 mt-3">
                                 <div class="form-group">
                                     <label>Billing Address</label>
-
+                                    <select class="form-select form-select-sm mb-1 text-primary fw-semibold" id="billing_address_dropdown" style="display:none; font-size: 11px; background-color: #f0f7ff; border-color: #93c5fd;">
+                                        <option value="">-- Choose Billing Address --</option>
+                                    </select>
                                     <textarea class="form-control" style="background-color: #dedede;" name="billingad"
                                         id="billingAddress" readonly autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">{{ $lead->billaddress }}</textarea>
 
@@ -243,6 +260,9 @@ select:disabled {
                             <div class="col-lg-3 mt-3">
                                 <div class="form-group">
                                     <label>Shipping Address</label>
+                                    <select class="form-select form-select-sm mb-1 text-primary fw-semibold" id="shipping_address_dropdown" style="display:none; font-size: 11px; background-color: #f0f7ff; border-color: #93c5fd;">
+                                        <option value="">-- Choose Registered Address --</option>
+                                    </select>
                                     <textarea class="form-control" name="placeofsupply" id="shippingAddress" required autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other"></textarea>
                                 </div>
                             </div>
@@ -376,6 +396,7 @@ select:disabled {
                                 <div class="form-group">
                                     <label>Shipping GST No</label>
                                     <input type="text" name="gstnum" id="gstnum" class="form-control" autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
+                                    <small class="d-block mt-1" id="shipping_gst_status" style="font-size: 10px;"></small>
                                 </div>
                             </div>
                             @php
@@ -896,8 +917,8 @@ select:disabled {
                                         class="form-control">
                                 </div>
                             </div> --}}
-<div class="text-end mt-3">
-    <button type="button" class="btn btn-primary" onclick="goToTerms()">
+<div class="col-12 text-center mt-4">
+    <button type="button" class="btn btn-primary px-4" onclick="goToTerms()">
         Next → Terms & Conditions
     </button>
 </div>
@@ -964,12 +985,12 @@ select:disabled {
                                 </div>
 
                                 <div class="form-group mt-3">
-                                    <label>Unloading at site</label>
-                                    <select class="form-select quotation-master-select" name="unloading" data-placeholder="Search or Select Unloading at site">
+                                    <label>Unloading at site <span style="color:red">*</span></label>
+                                    <select class="form-select quotation-master-select" name="unloading" data-placeholder="Search or Select Unloading at site" required>
                                         <option value=""> -- Choose -- </option>
                                         <option value="new">+ Add Custom Unloading at site</option>
                                         @foreach (App\Models\QuotationUnloadingOption::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get() as $option)
-                                            <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                            <option value="{{ $option->id }}" {{ old('unloading') == $option->id ? 'selected' : '' }}>{{ $option->name }}</option>
                                         @endforeach
                                     </select>
                                     <input type="text" class="form-control mt-2 quotation-master-new-input" name="new_unloading"
@@ -999,64 +1020,72 @@ select:disabled {
 
                                 @php
                                     $isSuperAdmin = Auth::check() && (Auth::user()->role === 'Super Admin');
+                                    $hasAdditionalWarranty = old('has_additional_warranty') === 'yes' || (old('additional_warranty_months') && old('additional_warranty_months') !== '0');
                                 @endphp
                                 <div class="form-group mt-3">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                         <label class="mb-0">Additional Warranty</label>
-                                        <div class="form-check form-check-inline mb-0">
-                                            <input class="form-check-input" type="checkbox" id="include_warranty_in_basic" name="include_warranty_in_basic" value="1" {{ old('include_warranty_in_basic') ? 'checked' : '' }}>
-                                            <label class="form-check-label small text-muted" for="include_warranty_in_basic">Include in Basic Total</label>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Additional Warranty">
+                                            <input type="radio" class="btn-check" name="has_additional_warranty" id="has_warranty_yes" value="yes" autocomplete="off" {{ $hasAdditionalWarranty ? 'checked' : '' }}>
+                                            <label class="btn btn-outline-primary btn-sm px-3 py-1" for="has_warranty_yes" style="font-size: 11.5px; font-weight: 600; cursor: pointer;">Yes</label>
+
+                                            <input type="radio" class="btn-check" name="has_additional_warranty" id="has_warranty_no" value="no" autocomplete="off" {{ !$hasAdditionalWarranty ? 'checked' : '' }}>
+                                            <label class="btn btn-outline-secondary btn-sm px-3 py-1" for="has_warranty_no" style="font-size: 11.5px; font-weight: 600; cursor: pointer;">No</label>
                                         </div>
                                     </div>
-                                    <select class="form-select" id="additional_warranty_months_select" name="additional_warranty_months">
-                                        @if($isSuperAdmin)
-                                            <option value="custom" data-pct="0">+ Custom Period / Percentage</option>
-                                        @endif
-                                        <option value="0" data-pct="0" selected>None (0 Months - Standard Only)</option>
-                                        <option value="6" data-pct="2.5">6 Months (Default 2.5%)</option>
-                                        <option value="12" data-pct="5.0">12 Months (Default 5.0%)</option>
-                                        <option value="18" data-pct="7.5">18 Months (Default 7.5%)</option>
-                                        <option value="24" data-pct="10.0">24 Months (Default 10.0%)</option>
-                                    </select>
 
-                                    @if($isSuperAdmin)
-                                        <div id="warranty_dynamic_inputs_wrapper" class="mt-2 p-2 border rounded bg-light" style="display: none;">
-                                            <div class="row g-2 align-items-center">
-                                                <div class="col-6">
-                                                    <label class="small text-muted mb-1">Warranty Rate (%)</label>
-                                                    <div class="input-group input-group-sm">
-                                                        <input type="number" min="0" max="100" step="0.01" class="form-control" id="additional_warranty_percentage_input" name="additional_warranty_percentage" placeholder="Rate %" value="0.00">
-                                                        <span class="input-group-text">%</span>
+                                    <div id="additional_warranty_fields_wrapper" class="mt-2" style="{{ $hasAdditionalWarranty ? '' : 'display: none;' }}">
+                                        <input type="hidden" id="include_warranty_in_basic" name="include_warranty_in_basic" value="{{ $hasAdditionalWarranty ? '1' : '0' }}">
+                                        <select class="form-select" id="additional_warranty_months_select" name="additional_warranty_months">
+                                            @if($isSuperAdmin)
+                                                <option value="custom" data-pct="0">+ Custom Period / Percentage</option>
+                                            @endif
+                                            <option value="0" data-pct="0" {{ old('additional_warranty_months') === '0' || !old('additional_warranty_months') ? 'selected' : '' }}>None (0 Months - Standard Only)</option>
+                                            <option value="6" data-pct="2.5" {{ old('additional_warranty_months') == '6' ? 'selected' : '' }}>6 Months (Default 2.5%)</option>
+                                            <option value="12" data-pct="5.0" {{ old('additional_warranty_months') == '12' ? 'selected' : '' }}>12 Months (Default 5.0%)</option>
+                                            <option value="18" data-pct="7.5" {{ old('additional_warranty_months') == '18' ? 'selected' : '' }}>18 Months (Default 7.5%)</option>
+                                            <option value="24" data-pct="10.0" {{ old('additional_warranty_months') == '24' ? 'selected' : '' }}>24 Months (Default 10.0%)</option>
+                                        </select>
+
+                                        @if($isSuperAdmin)
+                                            <div id="warranty_dynamic_inputs_wrapper" class="mt-2 p-2 border rounded bg-light" style="display: none;">
+                                                <div class="row g-2 align-items-center">
+                                                    <div class="col-6">
+                                                        <label class="small text-muted mb-1">Warranty Rate (%)</label>
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="additional_warranty_percentage_input" name="additional_warranty_percentage" placeholder="Rate %" value="0.00">
+                                                            <span class="input-group-text">%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="small text-muted mb-1">Calculated Charge (₹)</label>
+                                                        <div class="input-group input-group-sm">
+                                                            <span class="input-group-text">₹</span>
+                                                            <input type="number" min="0" step="0.01" class="form-control" id="additional_warranty_charge_final" name="additional_warranty_charge" placeholder="Charge ₹" value="0.00">
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="col-6">
-                                                    <label class="small text-muted mb-1">Calculated Charge (₹)</label>
-                                                    <div class="input-group input-group-sm">
-                                                        <span class="input-group-text">₹</span>
-                                                        <input type="number" min="0" step="0.01" class="form-control" id="additional_warranty_charge_final" name="additional_warranty_charge" placeholder="Charge ₹" value="0.00">
-                                                    </div>
-                                                </div>
+                                                <small class="text-muted d-block mt-1" id="warranty_charge_display">
+                                                    Additional Warranty: None (₹0.00)
+                                                </small>
                                             </div>
+                                        @else
+                                            <input type="hidden" id="additional_warranty_percentage_input" name="additional_warranty_percentage" value="0.00">
+                                            <input type="hidden" id="additional_warranty_charge_final" name="additional_warranty_charge" value="0.00">
                                             <small class="text-muted d-block mt-1" id="warranty_charge_display">
                                                 Additional Warranty: None (₹0.00)
                                             </small>
-                                        </div>
-                                    @else
-                                        <input type="hidden" id="additional_warranty_percentage_input" name="additional_warranty_percentage" value="0.00">
-                                        <input type="hidden" id="additional_warranty_charge_final" name="additional_warranty_charge" value="0.00">
-                                        <small class="text-muted d-block mt-1" id="warranty_charge_display">
-                                            Additional Warranty: None (₹0.00)
-                                        </small>
-                                    @endif
+                                        @endif
+                                    </div>
                                 </div>
 
                                 @php
                                     $selectedDov = old('dov', optional($dovs->first())->value);
                                 @endphp
                                 <div class="form-group mt-3">
-    <label>Date of Validity</label>
+    <label>Date of Validity <span style="color:red">*</span></label>
 
-    <select class="form-select" name="dov" id="dovSelect" onchange="handleDovChange()">
+    <select class="form-select" name="dov" id="dovSelect" onchange="handleDovChange()" required>
         <option value="">-- Select --</option>
         <option value="new" {{ $selectedDov === 'new' ? 'selected' : '' }}>+ Add Custom</option>
         @foreach($dovs as $dov)
@@ -1091,17 +1120,17 @@ select:disabled {
                              </div>
                             <div class="col-md-4">
                                 <div class="form-group mt-3">
-                                    <label>Currency</label>
-                                    <input type="text" class="form-control" name="currency" value="INR">
+                                    <label>Currency <span style="color:red">*</span></label>
+                                    <input type="text" class="form-control" name="currency" value="{{ old('currency', 'INR') }}" required>
                                 </div>
 
                                 <div class="form-group mt-3">
-                                    <label>Installation Scope</label>
-                                    <select class="form-select quotation-master-select" name="installation" data-placeholder="Search or Select Installation Scope">
+                                    <label>Installation Scope <span style="color:red">*</span></label>
+                                    <select class="form-select quotation-master-select" name="installation" data-placeholder="Search or Select Installation Scope" required>
                                         <option value=""> -- Choose -- </option>
                                         <option value="new">+ Add Custom Installation Scope</option>
                                         @foreach (App\Models\QuotationInstallationScope::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get() as $option)
-                                            <option value="{{ $option->id }}">{{ $option->name }}</option>
+                                            <option value="{{ $option->id }}" {{ old('installation') == $option->id ? 'selected' : '' }}>{{ $option->name }}</option>
                                         @endforeach
                                     </select>
                                     <input type="text" class="form-control mt-2 quotation-master-new-input" name="new_installation"
@@ -1216,12 +1245,12 @@ select:disabled {
     <textarea class="form-control" name="remarks" id="remarks"></textarea>
 </div>
                                 <div class="form-group mt-3">
-                                    <label>Quotation Status</label>
-                                    <select class="form-select quotation-master-select" name="quto_status" id="quto_status" data-placeholder="Search or Select Quotation Status">
+                                    <label>Quotation Status <span style="color:red">*</span></label>
+                                    <select class="form-select quotation-master-select" name="quto_status" id="quto_status" data-placeholder="Search or Select Quotation Status" required>
                                         <option value="">-- Choose --</option>
                                         <option value="new">+ Add Custom Quotation Status</option>
                                         @foreach (App\Models\QuotationStatus::orderBy('name')->get() as $status)
-                                            <option value="{{ $status->id }}">{{ $status->name }}</option>
+                                            <option value="{{ $status->id }}" {{ old('quto_status') == $status->id ? 'selected' : '' }}>{{ $status->name }}</option>
                                         @endforeach
                                     </select>
                                     <input type="text" class="form-control mt-2 quotation-master-new-input" name="new_quto_status"
@@ -1235,18 +1264,58 @@ select:disabled {
                                     <label>Amount</label>
                                     <input type="number" class="form-control" name="ammt">
                                 </div> --}}
+                                <div class="card mt-4 border shadow-sm">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0 fw-bold">Engineering Drawings (GA &amp; Pit)</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label fw-bold">General Arrangement (GA) Drawing</label>
+                                                @php
+                                                    $currentGa = $quotations->ga_number ?? $lead->ganumber ?? null;
+                                                @endphp
+                                                @if($currentGa)
+                                                    <div class="d-flex align-items-center mb-2 p-2 border rounded bg-white">
+                                                        <span class="text-truncate me-2 small flex-grow-1" title="{{ basename($currentGa) }}">
+                                                            📄 {{ basename($currentGa) }}
+                                                        </span>
+                                                        <a href="{{ asset($currentGa) }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+                                                    </div>
+                                                    <input type="hidden" name="existing_ga_number" value="{{ $currentGa }}">
+                                                @endif
+                                                <input type="file" class="form-control" name="ga_number" id="quota_ga_number" accept=".pdf,.png,.jpg,.jpeg,.dwg">
+                                                <small class="text-muted d-block mt-1">Upload to {{ $currentGa ? 'replace existing' : 'attach GA drawing' }}</small>
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label class="form-label fw-bold">Civil Pit Drawing</label>
+                                                @php
+                                                    $currentPit = $quotations->pit_drawing ?? $lead->pit_drawing ?? null;
+                                                @endphp
+                                                @if($currentPit)
+                                                    <div class="d-flex align-items-center mb-2 p-2 border rounded bg-white">
+                                                        <span class="text-truncate me-2 small flex-grow-1" title="{{ basename($currentPit) }}">
+                                                            📐 {{ basename($currentPit) }}
+                                                        </span>
+                                                        <a href="{{ asset($currentPit) }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+                                                    </div>
+                                                    <input type="hidden" name="existing_pit_drawing" value="{{ $currentPit }}">
+                                                @endif
+                                                <input type="file" class="form-control" name="pit_drawing" id="quota_pit_drawing" accept=".pdf,.png,.jpg,.jpeg,.dwg">
+                                                <small class="text-muted d-block mt-1">Upload to {{ $currentPit ? 'replace existing' : 'attach Pit drawing' }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                            <div class="text-start mt-3">
-    <button type="button" class="btn btn-secondary" onclick="goToQuotation()">
-        ← Back to Quotation
-    </button>
-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+                            <button type="button" class="btn btn-secondary" onclick="goToQuotation()">
+                                ← Back to Quotation
+                            </button>
+                            <button type="submit" class="btn btn-warning px-5">Save Quotation</button>
+                        </div>
                     </div>
-                </div>
-
-                <div class="mt-5 text-center">
-                    <button type="submit" class="btn btn-warning px-5">Save Quotation</button>
                 </div>
             </form>
         </div>
@@ -1357,6 +1426,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     form.addEventListener('input', (e) => clearFieldError(e.target));
     form.addEventListener('change', (e) => clearFieldError(e.target));
+    $(form).on('change', 'select, input, textarea', function () {
+        clearFieldError(this);
+    });
 });
 
 function toggleQuotationStatusRemarks() {
@@ -1438,7 +1510,7 @@ $(document).ready(function () {
         if (billingAddr) $('#shippingAddress').val(billingAddr);
         if (billingCountry) $('#shipcountry').val(billingCountry);
         if (billingPostal) $('#shippostalcode').val(billingPostal);
-        if (billingGst) $('#gstnum').val(billingGst);
+        if (billingGst) $('#gstnum').val(billingGst).trigger('change');
 
         if (billingCity) {
             $('#shicity_list').attr('data-selected', billingCity);
@@ -1480,6 +1552,157 @@ $(document).ready(function () {
 
     if ($('#sameAsBilling').is(':checked')) {
         copyAddress();
+    }
+
+    // Dynamic Address Fetcher by GSTIN for Quotation / Estimate
+    function lookupAddressesByGst(gstInput, $dropdown, $textarea, $statusEl, autoFillIfSingle = false) {
+        let gstNo = (gstInput || '').trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        if (gstNo.length < 8) {
+            $dropdown.hide().empty();
+            $('#billing_address_dropdown').hide().empty();
+            if ($statusEl) $statusEl.html('');
+            return;
+        }
+
+        if ($statusEl) {
+            $statusEl.html('<span class="text-primary"><i class="fas fa-spinner fa-spin me-1"></i>Fetching addresses for GST...</span>');
+        }
+
+        $.ajax({
+            url: '/api/get-addresses-by-gst/' + encodeURIComponent(gstNo),
+            type: 'GET',
+            dataType: 'json',
+            success: function(res) {
+                $dropdown.empty();
+                $('#billing_address_dropdown').empty();
+                if (res && res.found && res.addresses && res.addresses.length > 0) {
+                    let optionsHtml = `<option value="">-- Select from ${res.count} Address${res.count > 1 ? 'es' : ''} --</option>`;
+                    let billingOptionsHtml = `<option value="">-- Change Billing Address (${res.count} available) --</option>`;
+                    res.addresses.forEach(function(item, idx) {
+                        optionsHtml += `<option value="${idx}">${item.label}</option>`;
+                        billingOptionsHtml += `<option value="${idx}">${item.label}</option>`;
+                    });
+                    $dropdown.html(optionsHtml).data('address-items', res.addresses).slideDown(150);
+                    $('#billing_address_dropdown').html(billingOptionsHtml).data('address-items', res.addresses).slideDown(150);
+
+                    // Default select Primary Address (index 0)
+                    $dropdown.val('0');
+                    let primaryItem = res.addresses[0];
+                    let currentShipping = ($textarea.val() || '').trim();
+                    if (!currentShipping && primaryItem) {
+                        let addr = primaryItem.raw_address || primaryItem.address;
+                        $textarea.val(addr);
+                        if (primaryItem.postalcode) $('#shippostalcode').val(primaryItem.postalcode);
+                        if (primaryItem.state_id) $('#state_listsh').val(primaryItem.state_id).trigger('change');
+                        if (primaryItem.city_id) setTimeout(() => $('#shicity_list').val(primaryItem.city_id), 300);
+                    }
+
+                    if ($statusEl) {
+                        if (res.addresses.length > 1) {
+                            $statusEl.html(`<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Primary address loaded (${res.count} branches available in dropdown)</span>`);
+                        } else {
+                            $statusEl.html('<span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Primary address auto-loaded</span>');
+                        }
+                    }
+                } else {
+                    $dropdown.hide();
+                    $('#billing_address_dropdown').hide();
+                    if ($statusEl) {
+                        $statusEl.html('<span class="text-muted"><i class="fas fa-info-circle me-1"></i>No saved addresses found for this GST</span>');
+                    }
+                }
+            },
+            error: function() {
+                if ($statusEl) $statusEl.html('');
+            }
+        });
+    }
+
+    $('#gstnum').on('input change paste', function() {
+        let val = $(this).val();
+        clearTimeout($(this).data('gstTimer'));
+        let timer = setTimeout(function() {
+            lookupAddressesByGst(val, $('#shipping_address_dropdown'), $('#shippingAddress'), $('#shipping_gst_status'), false);
+        }, 350);
+        $(this).data('gstTimer', timer);
+    });
+
+    $(document).on('change', '#shipping_address_dropdown', function() {
+        let idx = $(this).val();
+        if (idx === '' || idx === null) return;
+        let items = $(this).data('address-items') || [];
+        let item = items[idx];
+        if (item) {
+            let addr = item.raw_address || item.address;
+            $('#shippingAddress').val(addr);
+
+            if (item.postalcode) {
+                $('#shippostalcode').val(item.postalcode);
+            }
+
+            if (item.gst_number) {
+                $('#gstnum').val(item.gst_number);
+            }
+
+            if (item.state_id) {
+                $('#state_listsh').attr('data-selected', item.state_id);
+                $('#state_listsh').val(item.state_id).trigger('change');
+            } else if (item.state) {
+                // Match state by text
+                $('#state_listsh option').filter(function() {
+                    return $(this).text().trim().toLowerCase() === item.state.trim().toLowerCase();
+                }).prop('selected', true).trigger('change');
+            }
+
+            if (item.city_id) {
+                $('#shicity_list').attr('data-selected', item.city_id);
+                setTimeout(function() {
+                    $('#shicity_list').val(item.city_id);
+                }, 300);
+                setTimeout(function() {
+                    $('#shicity_list').val(item.city_id);
+                }, 800);
+            }
+        }
+    });
+
+    $(document).on('change', '#billing_address_dropdown', function() {
+        let idx = $(this).val();
+        if (idx === '' || idx === null) return;
+        let items = $(this).data('address-items') || [];
+        let item = items[idx];
+        if (item) {
+            let addr = item.raw_address || item.address;
+            $('#billingAddress').val(addr);
+
+            if (item.postalcode) {
+                $('#postalcode').val(item.postalcode);
+            }
+
+            if (item.state_id) {
+                $('#state_list').attr('data-selected', item.state_id);
+                $('#state_list').val(item.state_id).trigger('change');
+            } else if (item.state) {
+                $('#state_list option').filter(function() {
+                    return $(this).text().trim().toLowerCase() === item.state.trim().toLowerCase();
+                }).prop('selected', true).trigger('change');
+            }
+
+            if (item.city_id) {
+                $('#city_list').attr('data-selected', item.city_id);
+                setTimeout(function() {
+                    $('#city_list').val(item.city_id);
+                }, 300);
+                setTimeout(function() {
+                    $('#city_list').val(item.city_id);
+                }, 800);
+            }
+        }
+    });
+
+    let initialGst = ($('#gstnum').val() || $('#billgs').val() || '').trim();
+    if (initialGst) {
+        lookupAddressesByGst(initialGst, $('#shipping_address_dropdown'), $('#shippingAddress'), $('#shipping_gst_status'), false);
     }
 });
 
@@ -1758,20 +1981,26 @@ $(document).ready(function () {
         updateAccessoryBadge(tr);
     });
 
-    // Installation Charge JS logic
+    // Installation Charge & Scope JS logic
     window.recalculateProductInstallationDefault = function () {
         let hasGoodsLift = false;
         let has15kKeyword = false;
 
         $('#productRows .productSelect').each(function () {
+            let tr = $(this).closest('tr');
             let selectedOptionText = $(this).find('option:selected').text() || '';
             let textLower = selectedOptionText.toLowerCase();
+            let catText = (tr.find('.categorySelect option:selected').text() || '').toLowerCase();
 
-            if (textLower.indexOf('goods lift') !== -1 || textLower.indexOf('goods lifts') !== -1) {
+            if (textLower.indexOf('goods lift') !== -1 || textLower.indexOf('goods lifts') !== -1 ||
+                textLower.indexOf('goodslift') !== -1 || catText.indexOf('goods lift') !== -1) {
                 hasGoodsLift = true;
             }
             if (textLower.indexOf('dock leveler') !== -1 || textLower.indexOf('dock levelers') !== -1 ||
-                textLower.indexOf('scissor lift') !== -1 || textLower.indexOf('scissor lifts') !== -1) {
+                textLower.indexOf('docl leveler') !== -1 || textLower.indexOf('dock') !== -1 ||
+                textLower.indexOf('scissor lift') !== -1 || textLower.indexOf('scissor lifts') !== -1 ||
+                textLower.indexOf('scissorlift') !== -1 ||
+                catText.indexOf('scissor lift') !== -1 || catText.indexOf('dock leveler') !== -1) {
                 has15kKeyword = true;
             }
         });
@@ -1788,7 +2017,42 @@ $(document).ready(function () {
         }
 
         handleInstallationChargeChange();
+
+        // Auto-select Installation Scope:
+        // Dock Leveler, Scissor Lift, Goods Lift => 'Mercuriis Scope'
+        // All others => 'None'
+        let instScopeSelect = $('select[name="installation"]');
+        if (instScopeSelect.length && !instScopeSelect.data('userManuallySet')) {
+            let needsMercuriis = hasGoodsLift || has15kKeyword;
+            let matchedOption = null;
+
+            if (needsMercuriis) {
+                matchedOption = instScopeSelect.find('option').filter(function () {
+                    return $(this).text().trim().toLowerCase().indexOf('mercuriis') !== -1;
+                });
+            } else {
+                matchedOption = instScopeSelect.find('option').filter(function () {
+                    return $(this).text().trim().toLowerCase() === 'none';
+                });
+            }
+
+            if (matchedOption && matchedOption.length && matchedOption.val()) {
+                if (instScopeSelect.val() !== matchedOption.val()) {
+                    instScopeSelect.val(matchedOption.val()).trigger('change');
+                }
+            }
+        }
     };
+
+    $(document).on('change', 'select[name="installation"]', function (e) {
+        if (e.originalEvent) {
+            $(this).data('userManuallySet', true);
+        }
+    });
+
+    $(document).on('select2:select', 'select[name="installation"]', function () {
+        $(this).data('userManuallySet', true);
+    });
 
     $(document).on('change', '#installation_charge_type', function () {
         $(this).data('userManuallySet', true);
@@ -1863,8 +2127,12 @@ $(document).ready(function () {
         }
     });
 
-    $(document).on('change', '.productSelect', function () {
+    $(document).on('change select2:select', '.productSelect', function () {
         recalculateProductInstallationDefault();
+    });
+
+    $(document).on('click', '.removeRow', function () {
+        setTimeout(recalculateProductInstallationDefault, 50);
     });
 
     window.handleFreightCategoryChange = function () {
@@ -1891,18 +2159,21 @@ $(document).ready(function () {
         let val = select.val();
         let opt = select.find('option:selected');
         let defaultPct = parseFloat(opt.data('pct')) || 0;
+        let isYes = $('input[name="has_additional_warranty"]:checked').val() === 'yes';
 
         let basicTotal = 0;
         $('tr').has('.rate').each(function () {
             basicTotal += parseFloat($(this).find('.lbt').val()) || 0;
         });
 
-        if (val === '0') {
+        if (!isYes || val === '0') {
             $('#warranty_dynamic_inputs_wrapper').hide();
             $('#additional_warranty_percentage_input').val('0.00').data('userModified', false);
             $('#additional_warranty_charge_final').val('0.00');
             $('#warranty_charge_display').text('Additional Warranty: None (₹0.00)');
+            $('#include_warranty_in_basic').val('0');
         } else if (val === 'custom') {
+            $('#include_warranty_in_basic').val('1');
             $('#warranty_dynamic_inputs_wrapper').show();
             let currPct = parseFloat($('#additional_warranty_percentage_input').val()) || 0;
             let currCharge = parseFloat($('#additional_warranty_charge_final').val()) || 0;
@@ -1912,6 +2183,7 @@ $(document).ready(function () {
             }
             $('#warranty_charge_display').html('Custom Additional Warranty: <strong>₹' + currCharge.toLocaleString('en-IN', {minimumFractionDigits: 2}) + '</strong> (' + currPct.toFixed(2) + '% of ₹' + basicTotal.toLocaleString('en-IN', {minimumFractionDigits: 2}) + ')');
         } else {
+            $('#include_warranty_in_basic').val('1');
             $('#warranty_dynamic_inputs_wrapper').show();
             let months = parseInt(val) || 0;
             let isUserModified = $('#additional_warranty_percentage_input').data('userModified');
@@ -1923,6 +2195,25 @@ $(document).ready(function () {
             $('#warranty_charge_display').html('Additional Warranty: <strong>' + months + ' Months</strong> (₹' + charge.toLocaleString('en-IN', {minimumFractionDigits: 2}) + ' &bull; ' + effectivePct.toFixed(2) + '% of ₹' + basicTotal.toLocaleString('en-IN', {minimumFractionDigits: 2}) + ')');
         }
     };
+
+    $(document).on('change', 'input[name="has_additional_warranty"]', function () {
+        const isYes = $(this).val() === 'yes';
+        if (isYes) {
+            $('#additional_warranty_fields_wrapper').slideDown(150);
+            if ($('#additional_warranty_months_select').val() === '0') {
+                $('#additional_warranty_months_select').val('6');
+            }
+            $('#include_warranty_in_basic').val('1');
+            handleAdditionalWarrantyChange();
+        } else {
+            $('#additional_warranty_fields_wrapper').slideUp(150);
+            $('#additional_warranty_months_select').val('0');
+            $('#include_warranty_in_basic').val('0');
+            $('#additional_warranty_percentage_input').val('0.00').data('userModified', false);
+            $('#additional_warranty_charge_final').val('0.00');
+            handleAdditionalWarrantyChange();
+        }
+    });
 
     $(document).on('change', '#additional_warranty_months_select', function () {
         $('#additional_warranty_percentage_input').data('userModified', false);

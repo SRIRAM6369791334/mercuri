@@ -71,7 +71,7 @@
                         <div class="row">
                             <div class="col-lg-6">
                                 <div class="mt-3">
-                                    <label for="status" anme class="form-label">Select Status</label>
+                                    <label for="status" anme class="form-label">Lead Status</label>
                                     <select class="form-select" id="leadstatus" name="Leadstatus">
     <option value="">-- Choose Status --</option>
 
@@ -95,7 +95,7 @@
 
                             <div class="col-lg-6">
                                 <div class="form-group mt-3">
-                                    <label for="exampleFormControlInput1" class="form-label">Source of Enquiry</label>
+                                    <label for="exampleFormControlInput1" class="form-label">Lead Source of Enquiry</label>
                                     <select class="form-select " name="Leadsource" id="source_enquiry">
                                         <option value="">-- Choose Source --</option>
                                         @if ($status = App\Models\Dropdowndata::where('formid', 4)->orderBy('orderno', 'asc')->get())
@@ -155,9 +155,17 @@
 
                         <div class="col-lg-6">
                             <div class="form-group mt-3">
-                                <label class="form-label">GA Number</label>
+                                <label class="form-label">GA Drawing</label>
                                 <input type="file" class="form-control" name="ga_number" id="ga_number"
-                                    accept=".pdf, .docx, .jpg, .png">
+                                    accept=".pdf, .docx, .jpg, .png, .dwg">
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="form-group mt-3">
+                                <label class="form-label">Pit Drawing</label>
+                                <input type="file" class="form-control" name="pit_drawing" id="pit_drawing"
+                                    accept=".pdf, .docx, .jpg, .png, .dwg">
                             </div>
                         </div>
 
@@ -635,6 +643,36 @@ function copyBillingAddress() {
     const billing = document.getElementById("lead_address").value;
     document.getElementById("lead_com_address").value = billing;
 }
+
+// Auto-fill Primary Address & Customer Details when GST is entered in Lead
+$('#lead_gst').on('input change paste', function() {
+    let gstVal = ($(this).val() || '').trim().toUpperCase();
+    if (gstVal.length === 15) {
+        $.ajax({
+            url: '/get-customer-by-gst/' + encodeURIComponent(gstVal),
+            method: 'GET',
+            success: function(res) {
+                if (res && res.found) {
+                    if (res.address && !$('#lead_address').val()) {
+                        $('#lead_address').val(res.address);
+                    }
+                    if (res.communication_address && !$('#lead_com_address').val()) {
+                        $('#lead_com_address').val(res.communication_address);
+                    }
+                    if (res.customername && $('#lead_customerSelect').val() === 'new') {
+                        $('#newCustomerName').val(res.customername);
+                    }
+                    if (res.contactname && !$('#lead_contactName').val()) {
+                        $('#lead_contactName').val(res.contactname);
+                    }
+                    if (res.contact_no && !$('#lead_mobile').val()) {
+                        $('#lead_mobile').val(res.contact_no);
+                    }
+                }
+            }
+        });
+    }
+});
 </script>
 <script>
 // $('.select2').select2({

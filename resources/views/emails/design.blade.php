@@ -16,7 +16,7 @@
         <h4>Design Specifications</h4>
         <ul>
             @foreach($specifications as $spec)
-                <li>{{ $spec->spec_value }}</li>
+                <li><strong>{{ $spec->spec_name ?? 'Specification' }}:</strong> {{ $spec->spec_value }}</li>
             @endforeach
         </ul>
     @endif

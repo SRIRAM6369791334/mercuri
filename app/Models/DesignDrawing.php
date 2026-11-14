@@ -11,8 +11,9 @@ class DesignDrawing extends Model
     protected $fillable = [
         'design_id',
         'file_path',
+        'drawing_type',
         'drawing_app',
-    'drawing_remarks',
-    'sales_attach',
+        'drawing_remarks',
+        'sales_attach',
     ];
 }

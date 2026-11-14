@@ -180,7 +180,7 @@ $orfSummary = [
                 </div>
 
 
-                <div class="modal fade" id="statusModale" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+                <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -192,6 +192,7 @@ $orfSummary = [
                                     @csrf
                                     <input type="hidden" id="orfid" name="orfid">
                                     <input type="hidden" id="cssta" name="cssta">
+                                    <input type="hidden" id="sales_check_drawing_value" name="check_drawing" value="0">
 
                                     <div class="form-group mt-4 mb-3">
                                         <label for="exampleFormControlInput1" class="form-label">Approval Proceed <span
@@ -211,22 +212,19 @@ $orfSummary = [
                                     </div>
 
                                     <div class="form-group mt-3">
-                                        <label class="form-label">Verification Checklist</label>
+                                        <label class="form-label fw-bold">Verification Checklist</label>
                                         <div class="form-check">
-                                            <input class="form-check-input approval-check" type="checkbox" id="sales_check_po">
+                                            <input class="form-check-input approval-check" type="checkbox" id="sales_check_po" name="check_po" value="1">
                                             <label class="form-check-label" for="sales_check_po">PO verified</label>
                                         </div>
-                                        <div class="form-check">
+                                        <div class="form-check" id="sales_drawing_check_container">
                                             <input class="form-check-input approval-check" type="checkbox" id="sales_check_drawing">
-                                            <label class="form-check-label" for="sales_check_drawing">Drawing verified</label>
+                                            <label class="form-check-label" for="sales_check_drawing" id="sales_drawing_label">Drawing verified</label>
+                                            <span class="badge bg-secondary ms-2" id="drawing_not_required_badge" style="display:none;">Drawing Not Required (Standard Product)</span>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input approval-check" type="checkbox" id="sales_check_quotation">
-                                            <label class="form-check-label" for="sales_check_quotation">Quotation verified</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input approval-check" type="checkbox" id="sales_check_orf">
-                                            <label class="form-check-label" for="sales_check_orf">ORF verified</label>
+                                            <input class="form-check-input approval-check" type="checkbox" id="sales_check_commercial" name="check_commercial" value="1">
+                                            <label class="form-check-label" for="sales_check_commercial">Commercial details verified</label>
                                         </div>
                                     </div>
 
@@ -269,23 +267,17 @@ $orfSummary = [
                                             rows="3"></textarea>
                                     </div>
 
-                                    <div class="form-group mt-3">
-                                        <label class="form-label">Verification Checklist</label>
-                                        <div class="form-check">
-                                            <input class="form-check-input cs-approval-check" type="checkbox" id="cs_check_po">
-                                            <label class="form-check-label" for="cs_check_po">PO verified</label>
+                                    <div class="form-group mt-3 mb-3">
+                                        <label class="form-label fw-bold">Verification Checklist</label>
+                                        <div class="form-check d-flex align-items-center mb-2">
+                                            <input class="form-check-input cs-approval-check me-2" type="checkbox" name="check_quotation" id="cs_check_quotation" value="1">
+                                            <label class="form-check-label mb-0" for="cs_check_quotation">Quotation verified</label>
+                                            <a href="#" id="cs_view_quotation" target="_blank" class="badge bg-primary text-white text-decoration-none ms-2" style="display:none;" title="View Quotation">View</a>
                                         </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input cs-approval-check" type="checkbox" id="cs_check_drawing">
-                                            <label class="form-check-label" for="cs_check_drawing">Drawing verified</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input cs-approval-check" type="checkbox" id="cs_check_quotation">
-                                            <label class="form-check-label" for="cs_check_quotation">Quotation verified</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input cs-approval-check" type="checkbox" id="cs_check_orf">
-                                            <label class="form-check-label" for="cs_check_orf">ORF verified</label>
+                                        <div class="form-check d-flex align-items-center mb-2">
+                                            <input class="form-check-input cs-approval-check me-2" type="checkbox" name="check_orf" id="cs_check_orf" value="1">
+                                            <label class="form-check-label mb-0" for="cs_check_orf">ORF verified</label>
+                                            <a href="#" id="cs_view_orf" target="_blank" class="badge bg-warning text-dark text-decoration-none ms-2" style="display:none;" title="View ORF Detail">View</a>
                                         </div>
                                     </div>
 
@@ -318,6 +310,51 @@ $orfSummary = [
                         $(document).on('click', function (e) {
                             if (!$(e.target).closest('.dropdown').length) {
                                 $('.dropdown-menu').removeClass('show');
+                            }
+                        });
+
+                        // Dynamic Drawing Checklist for Sales Status Modal
+                        $('body').on('click', '.orf-status-btn, [data-bs-target="#statusModal"]', function () {
+                            var orfId = $(this).data('id');
+                            var csSta = $(this).data('cssta');
+                            var sigDraw = $(this).data('sigdraw');
+
+                            $('#orfid').val(orfId);
+                            $('#cssta').val(csSta);
+
+                            if (!sigDraw || sigDraw === '' || sigDraw === 'null' || sigDraw === undefined) {
+                                $('#sales_check_drawing').prop('checked', true).prop('disabled', true);
+                                $('#sales_check_drawing_value').val('1');
+                                $('#drawing_not_required_badge').show();
+                                $('#sales_drawing_label').hide();
+                            } else {
+                                $('#sales_check_drawing').prop('checked', false).prop('disabled', false);
+                                $('#sales_check_drawing_value').val('0');
+                                $('#drawing_not_required_badge').hide();
+                                $('#sales_drawing_label').show();
+                            }
+
+                            $('#sales_check_drawing').off('change.checklist').on('change.checklist', function () {
+                                $('#sales_check_drawing_value').val(this.checked ? '1' : '0');
+                            });
+                        });
+
+                        // CS Status Modal Population
+                        $('body').on('click', '.orf-csstatus-btn, [data-bs-target="#statusModalcs"]', function () {
+                            var orfId = $(this).data('rid');
+                            var appSta = $(this).data('appsta');
+                            var checkQuo = $(this).data('checkquotation');
+                            var checkOrf = $(this).data('checkorf');
+                            var quoproid = $(this).data('quoproid');
+
+                            $('#orfidcs').val(orfId);
+                            $('#appsta').val(appSta);
+                            $('#cs_check_quotation').prop('checked', checkQuo == 1);
+                            $('#cs_check_orf').prop('checked', checkOrf == 1);
+
+                            if (quoproid) {
+                                $('#cs_view_quotation').attr('href', '/quotation/view/' + quoproid).show();
+                                $('#cs_view_orf').attr('href', '/orfdetail/view/' + quoproid).show();
                             }
                         });
                     });

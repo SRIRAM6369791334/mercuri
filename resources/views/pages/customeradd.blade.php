@@ -528,41 +528,19 @@
 
             function handleCustomerSubmission() {
                 var $this = $(".gst-number-field");
-                var gstNumber = $this.val();
+                var rawGst = $this.val() || '';
+                var gstNumber = rawGst.trim().toUpperCase();
+                const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
-                if (gstNumber && gstNumber.length == 15 && gstValidationLocal == "active") {
-                    $.ajax({
-                        url: 'https://gst-return-status.p.rapidapi.com/free/gstin/' + gstNumber,
-                        method: 'GET',
-                        headers: {
-                            'x-rapidapi-key': 'f216e3cbefmsh74bb68190d526a5p1fcdb1jsn7712055aeb4a',
-                            'x-rapidapi-host': 'gst-return-status.p.rapidapi.com'
-                        },
-                        success: function (response) {
-                            if (response.success) {
-                                $this.closest('.form-group').find('.gst-input-div i.fa-check-circle').show();
-                                $this.closest('.form-group').find('.gst-input-div i.fa-times-circle').hide();
-                                $this.closest('.form-group').find('.error-msg').text('');
-                                submitCustomerFormAjax();
-                            } else {
-                                $this.closest('.form-group').find('.error-msg').text('Invalid GST Number');
-                                $("#customer_name").val('');
-                                $("#cus-address").val('');
-                                $("#cus-pincode").val('');
-                            }
-                        },
-                        error: function () {
-                            $("#customer_name").val('');
-                            $("#cus-address").val('');
-                            $("#cus-pincode").val('');
-                            $this.closest('.form-group').find('.error-msg').text('Invalid GST Number');
-                            $this.closest('.form-group').find('.gst-input-div i.fa-check-circle').hide();
-                            $this.closest('.form-group').find('.gst-input-div i.fa-times-circle').show();
-                        }
-                    });
-                } else {
-                    submitCustomerFormAjax();
+                if (gstNumber && gstValidationLocal == "active") {
+                    if (!gstRegex.test(gstNumber)) {
+                        $this.closest('.form-group').find('.error-msg').text('Invalid GST format. (e.g. 33AADCC5363L1ZL)');
+                        $this.closest('.form-group').find('.gst-input-div i.fa-check-circle').hide();
+                        $this.closest('.form-group').find('.gst-input-div i.fa-times-circle').show();
+                        return;
+                    }
                 }
+                submitCustomerFormAjax();
             }
 
             function buildFormData(container) {

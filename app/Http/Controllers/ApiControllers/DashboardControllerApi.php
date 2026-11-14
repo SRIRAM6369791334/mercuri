@@ -438,14 +438,14 @@ class DashboardControllerApi extends Controller
             'id' => 'required|exists:products,id',
         ]);
 
-        $term = Product::find($validated['id']);
+        $product = Product::find($validated['id']);
 
-        if ($term) {
-            $term->delete();
-            return ResponseHelper::successResponseData('Success', 'Term deleted successfully');
+        if ($product) {
+            $product->delete();
+            return ResponseHelper::successResponseData('Success', 'Product deleted successfully');
         }
 
-        return ResponseHelper::errorResponse('Error', 'Term not found');
+        return ResponseHelper::errorResponse('Error', 'Product not found');
     }
     public function deleteProductsCategories(Request $request)
     {
@@ -453,13 +453,13 @@ class DashboardControllerApi extends Controller
             'id' => 'required|exists:product_categories_tb,id',
         ]);
 
-        $term = ProductCategory::find($validated['id']);
+        $category = ProductCategory::find($validated['id']);
 
-        if ($term) {
-            $term->delete();
-            return ResponseHelper::successResponseData('Success', 'Term deleted successfully');
+        if ($category) {
+            $category->delete();
+            return ResponseHelper::successResponseData('Success', 'Product category deleted successfully');
         }
 
-        return ResponseHelper::errorResponse('Error', 'Term not found');
+        return ResponseHelper::errorResponse('Error', 'Product category not found');
     }
 }

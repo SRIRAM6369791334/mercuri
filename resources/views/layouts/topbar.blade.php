@@ -271,6 +271,14 @@
                         </li>
                     @endcanany
 
+                    @can('purchase-order-display')
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url('/order-po-tracking') }}" data-key="t-calendar">
+                                <i data-feather="truck"></i><span>Supplier PO Tracking</span>
+                            </a>
+                        </li>
+                    @endcan
+
                     @can('vendor-master-display')
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle arrow-none" href="#" id="topnav-pages" role="button">
@@ -287,8 +295,6 @@
                                     <a href="{{ url('/purchase-order-details') }}" class="dropdown-item"
                                         data-key="t-calendar">Purchase
                                         Order</a>
-                                    <a href="{{ url('/order-po-tracking') }}" class="dropdown-item"
-                                        data-key="t-calendar">Order PO Tracking</a>
                                 @endcan
 
                                 @can('purchase-entry-display')
@@ -325,7 +331,7 @@
                     @endcanany
 
                     {{-- @can('others-display') --}}
-                    @if (Auth::user()->role == 'Super Admin')
+                    @if (Auth::user()?->role == 'Super Admin')
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle arrow-none" href="#" id="topnav-pages" role="button">
                                 <i data-feather="grid"></i><span data-key="t-apps">Others</span>
@@ -343,7 +349,7 @@
                             </div>
                         </li>
                     @endif
-                    @if(auth()->user()->role === 'Design Engineer')
+                    @if(auth()->user()?->role === 'Design Engineer')
 
          <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle arrow-none" href="{{ route('design.engineer.list') }}" id="topnav-dashboard"
@@ -353,7 +359,7 @@
                         </li>
 @endif
 
-                    @if (Auth::user()->role == 'HR')
+                    @if (Auth::user()?->role == 'HR')
                         {{-- @endcan --}}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle arrow-none" href="#" id="topnav-pages" role="button">
@@ -400,198 +406,244 @@
 
 
 
-            <div class="dropdown d-inline-block">
+            <div class="d-flex align-items-center gap-2">
+                @php
+                    use App\Models\Term;
+                    use App\Models\Orf;
+                    use App\Models\Lead;
+                    use App\Models\QuotationProduct;
+                    use App\Models\Freight;
+                    use App\Models\PurchaseOrder;
+                    use Illuminate\Support\Facades\Auth;
+                    use Illuminate\Support\Facades\Schema;
 
-                <button type="button" class="btn header-item bg-light-subtle border-start border-end"
-                    style=" background-color:#ffffff !important; border:none !important;">
-                    @php
-                        use App\Models\Term;
-                        use App\Models\Orf;
-                        use App\Models\Lead;
-                        use App\Models\QuotationProduct;
-                        use App\Models\Freight;
-                        use Illuminate\Support\Facades\Auth;
+                    $userRole = Auth::user()?->role;
 
-                        $userRole = Auth::user()->role;
+                    // Fetch counts based on role
+                    $termApprovalCount = 0;
+                    $freightApprovalCount = 0;
+                    $orfApprovalCount = 0;
+                    $orfcsApprovalCount = 0;
+                    $movequtoApprovalCount = 0;
+                    $disApprovalCount = 0;
+                    $stockCount = 0;
+                    $pendingSirAdvanceCount = 0;
+                    $pendingFinanceAdvanceCount = 0;
+                    $rejectedSirAdvanceCount = 0;
+                    $dispatchDueCount = 0;
+                    $totalNotifications = 0;
 
-                        // Fetch counts based on role
-                        $termApprovalCount = 0;
-                        $freightApprovalCount = 0;
-                        $orfApprovalCount = 0;
-                        $orfcsApprovalCount = 0;
-                        $movequtoApprovalCount = 0;
-                        // $qutoApprovalCount = 0;
-                        $totalNotifications = 0;
-                        $stockCount = 0;
+                    $settingsDetails = App\Models\AdminSetting::first();
+                    $hasPoTable = Schema::hasTable('purchase_order_tb');
+                    $hasAdvCol = $hasPoTable && Schema::hasColumn('purchase_order_tb', 'advance_status');
+                    $hasDispCol = $hasPoTable && Schema::hasColumn('purchase_order_tb', 'supplier_dispatch_date');
 
-                        $settingsDetails = App\Models\AdminSetting::first();
+                    if ($hasDispCol) {
+                        $sevenDaysLater = now()->addDays(7)->format('Y-m-d');
+                        $dispatchDueCount = PurchaseOrder::whereNotNull('supplier_dispatch_date')
+                            ->where('supplier_dispatch_date', '<=', $sevenDaysLater)
+                            ->where(function($q) {
+                                $q->whereNull('production_milestone')->orWhereNotIn('production_milestone', ['dispatched', 'delivered']);
+                            })
+                            ->distinct('po_no')
+                            ->count('po_no');
+                    }
 
-                        if ($userRole === 'Service Coordinator' || $userRole === 'Cs') {
-                            $orfcsApprovalCount = Orf::where('cs_status', 0)->count();
-                            $totalNotifications = $orfcsApprovalCount;
-                        } elseif ($userRole === 'Design') {
-                        } else {
-                            $freightApprovalCount = Freight::where('freight_approve', 1)->count();
-                            $termApprovalCount = Term::where('term_approve', 1)->count();
-                            $orfApprovalCount = Orf::where('approval_status', 0)->count();
-                            $movequtoApprovalCount = Lead::where('quota_proceed', 0)->count();
-                            // $qutoApprovalCount = QuotationProduct::where('quto_app', 0)->count();
-                            //  $qutoApprovalCount +
-                            $disApprovalCount = QuotationProduct::where('dis_app', 1)->count();
-                            $stockCount = App\Models\ProductStock::with('product')->where("available_stock", '<=', $settingsDetails->product_stock_alert_count ?? 0)->count();
-                            $totalNotifications = $termApprovalCount + $orfApprovalCount + $movequtoApprovalCount + $disApprovalCount + $freightApprovalCount + $stockCount;
+                    if ($userRole === 'Service Coordinator' || $userRole === 'Cs') {
+                        $orfcsApprovalCount = Orf::where('cs_status', 0)->count();
+                        if ($hasAdvCol) {
+                            $rejectedSirAdvanceCount = PurchaseOrder::where('advance_status', 'rejected_by_sir')->distinct('po_no')->count('po_no');
                         }
-                    @endphp
+                        $totalNotifications = $orfcsApprovalCount + $rejectedSirAdvanceCount + $dispatchDueCount;
+                    } elseif ($userRole === 'Design') {
+                        // Design engineer role
+                    } else {
+                        $freightApprovalCount = Freight::where('freight_approve', 1)->count();
+                        $termApprovalCount = Term::where('term_approve', 1)->count();
+                        $orfApprovalCount = Orf::where('approval_status', 0)->count();
+                        $movequtoApprovalCount = Lead::where('quota_proceed', 0)->count();
+                        $disApprovalCount = QuotationProduct::where('dis_app', 1)->count();
+                        $stockCount = App\Models\ProductStock::where("available_stock", '<=', $settingsDetails->product_stock_alert_count ?? 0)->count();
 
-                    @if ($totalNotifications > 0)
-                    <div class="d-flex align-items-center gap-3 notification-settings-wrapper">
+                        if ($hasAdvCol) {
+                            $pendingSirAdvanceCount = PurchaseOrder::where('advance_status', 'pending_sir_approval')->distinct('po_no')->count('po_no');
+                            $pendingFinanceAdvanceCount = PurchaseOrder::where('advance_status', 'approved_by_sir')->distinct('po_no')->count('po_no');
+                        }
 
-    <!-- Notification Bell -->
-    {{-- <div class="dropdown notification-bell-div">
-        <a class="nav-link dropdown-toggle arrow-none position-relative"
-           href="#"
-           id="topnav-dashboard"
-           role="button"
-           data-bs-toggle="dropdown"
-           style="padding: 8px 10px;">
+                        $totalNotifications = $termApprovalCount + $orfApprovalCount + $movequtoApprovalCount + $disApprovalCount + $freightApprovalCount + $stockCount + $pendingSirAdvanceCount + $pendingFinanceAdvanceCount + $dispatchDueCount;
+                    }
 
-            <i class="mdi mdi-bell fs-5"></i>
+                    $userUnreadNotifications = Auth::check() ? Auth::user()->unreadNotifications()->take(5)->get() : collect();
+                    $userUnreadCount = Auth::check() ? Auth::user()->unreadNotifications()->count() : 0;
+                    $grandTotalBellCount = $totalNotifications + $userUnreadCount;
+                @endphp
 
-            @if ($userRole === 'Super Admin')
-                <span class="badge-count">{{ $totalNotifications }}</span>
-            @elseif ($userRole === 'Service Coordinator' || $userRole === 'Cs')
-                <span class="badge-count">{{ $orfcsApprovalCount }}</span>
-            @endif
-        </a>
+                <!-- Notification Bell -->
+                <div class="dropdown notification-bell-div">
+                    <a class="nav-link dropdown-toggle arrow-none position-relative text-dark d-flex align-items-center"
+                       href="#"
+                       id="topbarNotificationBell"
+                       role="button"
+                       data-bs-toggle="dropdown"
+                       aria-expanded="false"
+                       style="padding: 8px 10px;">
+                        <i class="mdi mdi-bell fs-5"></i>
+                        @if ($grandTotalBellCount > 0)
+                            <span class="badge-count">{{ $grandTotalBellCount }}</span>
+                        @endif
+                    </a>
 
-        <div class="dropdown-menu dropdown-menu-end" aria-labelledby="topnav-dashboard">
-            @if (($userRole === 'Service Coordinator' || $userRole === 'Cs') && $orfcsApprovalCount > 0)
-                <a href="/vieworf" class="dropdown-item">
-                    ORF CS Approval <span class="badge bg-danger">{{ $orfcsApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if ($userRole === 'Super Admin' && $termApprovalCount > 0)
-                <a href="/terms" class="dropdown-item">
-                    Terms Approval <span class="badge bg-danger">{{ $termApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if ($userRole === 'Super Admin' && $orfApprovalCount > 0)
-                <a href="/vieworf" class="dropdown-item">
-                    ORF Approval <span class="badge bg-danger">{{ $orfApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if ($userRole === 'Super Admin' && $movequtoApprovalCount > 0)
-                <a href="/viewmovequto" class="dropdown-item">
-                    Move Quotation Approval
-                    <span class="badge bg-danger">{{ $movequtoApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if ($userRole === 'Super Admin' && $disApprovalCount > 0)
-                <a href="/viewqutoapp" class="dropdown-item">
-                    Discount Approval <span class="badge bg-danger">{{ $disApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if ($userRole === 'Super Admin' && $freightApprovalCount > 0)
-                <a href="/viewqutoapp" class="dropdown-item">
-                    Freight Approval <span class="badge bg-danger">{{ $freightApprovalCount }}</span>
-                </a>
-            @endif
-
-            @if (($userRole === 'Super Admin' || $userRole === 'Purchase Manager') && $stockCount > 0)
-                <a href="/product-stocks" class="dropdown-item">
-                    Product Stock <span class="badge bg-danger">{{ $stockCount }}</span>
-                </a>
-            @endif
-        </div>
-    </div> --}}
-
-    <!-- Settings Icon -->
-    <a href="{{ url('/settings') }}" class="setting-menu">
-        <i class="fas fa-cog fs-5"></i>
-    </a>
-
-</div>
-@endif
-                        {{-- <div class="dropdown d-inline-block notification-bell-div">
-
-                            <a class="nav-link dropdown-toggle arrow-none" href="#" id="topnav-dashboard" role="button"
-                                style="padding: 10px;" data-bs-toggle="dropdown">
-                                <i data-feather="home"></i>
-                                @if ($userRole === 'Super Admin')
-                                    <span data-key="t-dashboards">
-                                        <i class="mdi mdi-bell"></i>
-
-                                        <span class="badge-count">{{ $totalNotifications }}</span>
-
-
-                                    </span>
+                    <div class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="topbarNotificationBell" style="min-width: 280px; max-width: 340px;">
+                        <div class="px-3 py-2 border-bottom fw-bold text-dark small d-flex justify-content-between align-items-center bg-light">
+                            <span><i class="fas fa-bell me-1 text-primary"></i> Notifications</span>
+                            <div class="d-flex align-items-center gap-1">
+                                @if ($grandTotalBellCount > 0)
+                                    <span class="badge bg-danger">{{ $grandTotalBellCount }} New</span>
                                 @endif
-                                @if ($userRole === 'Service Coordinator' || $userRole === 'Cs')
-                                    <span data-key="t-dashboards">
-                                        <i class="mdi mdi-bell"></i>
-
-                                        <span class="badge-count">{{ $orfcsApprovalCount }}</span>
-
-
-                                    </span>
-                                @endif
-                            </a>
-                            <div class="dropdown-menu" aria-labelledby="topnav-dashboard" style="left:-94px;">
-                                @if ($userRole === 'Service Coordinator' || $userRole === 'Cs' && $orfcsApprovalCount > 0)
-                                    <a href="/vieworf" class="dropdown-item" data-key="t-calendar">
-                                        ORF CS Approval <span class="badge bg-danger">{{ $orfcsApprovalCount }}</span>
-                                    </a>
-                                @endif
-
-                                @if ($userRole === 'Super Admin' && $termApprovalCount > 0)
-                                    <a href="/terms" class="dropdown-item" data-key="t-calendar">
-                                        Terms Approval <span class="badge bg-danger">{{ $termApprovalCount }}</span>
-                                    </a>
-                                @endif
-
-                                @if ($userRole === 'Super Admin' && $orfApprovalCount > 0)
-                                    <a href="/vieworf" class="dropdown-item" data-key="t-calendar">
-                                        ORF Approval <span class="badge bg-danger">{{ $orfApprovalCount }}</span>
-                                    </a>
-                                @endif
-                                @if ($userRole === 'Super Admin' && $movequtoApprovalCount > 0)
-                                    <a href="/viewmovequto" class="dropdown-item" data-key="t-calendar">
-                                        Move Quotation Approval <span
-                                            class="badge bg-danger">{{ $movequtoApprovalCount }}</span>
-                                    </a>
-                                @endif --}}
-                                {{-- @if ($userRole === 'Super Admin' && $qutoApprovalCount > 0)
-                                <a href="/viewqutoapp" class="dropdown-item" data-key="t-calendar">
-                                    Quotation Approval <span class="badge bg-danger">{{ $qutoApprovalCount }}</span>
-                                </a>
-                                @endif --}}
-                                {{-- @if ($userRole === 'Super Admin' && $disApprovalCount > 0)
-                                    <a href="/viewqutoapp" class="dropdown-item" data-key="t-calendar">
-                                        Discount Approval <span class="badge bg-danger">{{ $disApprovalCount }}</span>
-                                    </a>
-                                @endif
-                                @if ($userRole === 'Super Admin' && $freightApprovalCount > 0)
-                                    <a href="/viewqutoapp" class="dropdown-item" data-key="t-calendar">
-                                        Freight Approval <span class="badge bg-danger">{{ $freightApprovalCount }}</span>
-                                    </a>
-                                @endif
-                                @if (($userRole === 'Super Admin' || $userRole === 'Purchase Manager') && $stockCount > 0)
-                                    <a href="/product-stocks" class="dropdown-item product-stock-alert-header"
-                                        data-key="t-calendar">
-                                        Product Stock <span class="badge bg-danger">0</span>
-                                    </a>
+                                @if ($userUnreadCount > 0)
+                                    <button type="button" class="btn btn-link btn-xs p-0 text-primary small text-decoration-none" onclick="markAllNotificationsRead()" title="Mark all read" style="font-size: 11px;">
+                                        Mark read
+                                    </button>
                                 @endif
                             </div>
                         </div>
-                    @endif
-                    <a href="{{ url('/settings') }}" class="text-dark setting-menu"><i class="fas fa-cog"></i></a>
-                </button> --}}
+
+                        @if ($userUnreadNotifications->isNotEmpty())
+                            <div class="border-bottom pb-1 mb-1">
+                                @foreach ($userUnreadNotifications as $notif)
+                                    @php
+                                        $nData = $notif->data ?? [];
+                                        $nTitle = $nData['title'] ?? 'PO Alert';
+                                        $nMsg = $nData['message'] ?? 'Notification';
+                                        $nUrl = $nData['url'] ?? route('order-po-tracking');
+                                    @endphp
+                                    <a href="javascript:void(0)" onclick="markNotificationRead('{{ $notif->id }}', '{{ $nUrl }}')" class="dropdown-item py-2 px-3 border-bottom text-wrap" style="background-color: #f0f9ff; font-size: 11.5px;">
+                                        <div class="fw-bold text-primary mb-1 d-flex justify-content-between">
+                                            <span><i class="fas fa-bell text-warning me-1"></i>{{ $nTitle }}</span>
+                                            <small class="text-muted fw-normal">{{ $notif->created_at ? $notif->created_at->diffForHumans(null, true, true) : '' }}</small>
+                                        </div>
+                                        <div class="text-dark small lh-sm">{{ $nMsg }}</div>
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if ($totalNotifications === 0 && $userUnreadCount === 0)
+                            <div class="px-3 py-3 text-center text-muted small">
+                                <i class="fas fa-check-circle text-success mb-1 d-block fs-5"></i>
+                                All caught up! No pending items.
+                            </div>
+                        @else
+                            @if ($dispatchDueCount > 0)
+                                <a href="{{ route('order-po-tracking') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2 text-warning">
+                                    <span><i class="fas fa-truck text-warning me-2"></i>Dispatch Due (Within 1 Wk)</span>
+                                    <span class="badge bg-warning text-dark">{{ $dispatchDueCount }}</span>
+                                </a>
+                            @endif
+
+                            @if (($userRole === 'Service Coordinator' || $userRole === 'Cs') && $orfcsApprovalCount > 0)
+                                <a href="{{ url('/vieworf') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-clipboard-check text-info me-2"></i>ORF CS Approval</span>
+                                    <span class="badge bg-danger">{{ $orfcsApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if (($userRole === 'Service Coordinator' || $userRole === 'Cs') && $rejectedSirAdvanceCount > 0)
+                                <a href="{{ route('order-po-tracking', ['status' => 'rejected_sir']) }}" class="dropdown-item d-flex justify-content-between align-items-center py-2 text-danger">
+                                    <span><i class="fas fa-times-circle me-2"></i>Advance Rejected by Sir</span>
+                                    <span class="badge bg-danger">{{ $rejectedSirAdvanceCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($pendingSirAdvanceCount > 0)
+                                <a href="{{ route('order-po-tracking', ['status' => 'pending_sir']) }}" class="dropdown-item d-flex justify-content-between align-items-center py-2 text-danger fw-semibold">
+                                    <span><i class="fas fa-user-shield me-2"></i>Sir Advance Approvals</span>
+                                    <span class="badge bg-danger">{{ $pendingSirAdvanceCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($pendingFinanceAdvanceCount > 0)
+                                <a href="{{ route('order-po-tracking', ['status' => 'pending_finance']) }}" class="dropdown-item d-flex justify-content-between align-items-center py-2 text-primary fw-semibold">
+                                    <span><i class="fas fa-money-check-alt me-2"></i>Finance UTR Release</span>
+                                    <span class="badge bg-primary">{{ $pendingFinanceAdvanceCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($userRole === 'Super Admin' && $termApprovalCount > 0)
+                                <a href="{{ url('/terms') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-file-contract text-secondary me-2"></i>Terms Approval</span>
+                                    <span class="badge bg-danger">{{ $termApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($userRole === 'Super Admin' && $orfApprovalCount > 0)
+                                <a href="{{ url('/vieworf') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-tasks text-warning me-2"></i>ORF Approval</span>
+                                    <span class="badge bg-danger">{{ $orfApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($userRole === 'Super Admin' && $movequtoApprovalCount > 0)
+                                <a href="{{ url('/viewmovequto') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-share-square text-success me-2"></i>Move Quotation</span>
+                                    <span class="badge bg-danger">{{ $movequtoApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($userRole === 'Super Admin' && $disApprovalCount > 0)
+                                <a href="{{ url('/viewqutoapp') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-percent text-info me-2"></i>Discount Approval</span>
+                                    <span class="badge bg-danger">{{ $disApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if ($userRole === 'Super Admin' && $freightApprovalCount > 0)
+                                <a href="{{ url('/viewqutoapp') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-truck text-dark me-2"></i>Freight Approval</span>
+                                    <span class="badge bg-danger">{{ $freightApprovalCount }}</span>
+                                </a>
+                            @endif
+
+                            @if (($userRole === 'Super Admin' || $userRole === 'Purchase Manager') && $stockCount > 0)
+                                <a href="{{ url('/product-stocks') }}" class="dropdown-item d-flex justify-content-between align-items-center py-2">
+                                    <span><i class="fas fa-boxes text-danger me-2"></i>Low Product Stock</span>
+                                    <span class="badge bg-danger">{{ $stockCount }}</span>
+                                </a>
+                            @endif
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Settings Icon -->
+                <a href="{{ url('/settings') }}" class="setting-menu" title="System Settings">
+                    <i class="fas fa-cog fs-5"></i>
+                </a>
             </div>
         </nav>
     </div>
 </div>
+
+<script>
+function markNotificationRead(id, redirectUrl) {
+    fetch('/notifications/' + id + '/mark-as-read', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+            'Content-Type': 'application/json'
+        }
+    }).finally(() => {
+        if (redirectUrl) window.location.href = redirectUrl;
+    });
+}
+function markAllNotificationsRead() {
+    fetch('/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
+            'Content-Type': 'application/json'
+        }
+    }).then(() => {
+        window.location.reload();
+    });
+}
+</script>

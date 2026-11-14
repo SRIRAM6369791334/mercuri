@@ -251,6 +251,72 @@
                                 value="{{ old('department', $customer->department) }}" id="cus-department">
                         </div>
                     </div> --}}
+                    <!-- Additional Plant / Branch / Site Delivery Addresses -->
+                    <div class="col-12 mt-4">
+                        <div class="card border-primary-subtle shadow-sm">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                                <div>
+                                    <h6 class="mb-0 fw-bold text-primary">
+                                        <i class="fas fa-industry me-1"></i> Additional Site / Plant / Branch Delivery Addresses
+                                    </h6>
+                                    <small class="text-muted">Add multiple manufacturing units, delivery sites, or branch locations under this Customer / GSTIN</small>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary fw-bold" id="btnAddBranchAddress">
+                                    <i class="fas fa-plus me-1"></i> Add Plant / Delivery Address
+                                </button>
+                            </div>
+                            <div class="card-body p-3">
+                                <div id="branch_address_container">
+                                    @if (!empty($customerAddresses) && count($customerAddresses) > 0)
+                                        @foreach ($customerAddresses as $bIdx => $bAddr)
+                                            <div class="branch-card border rounded p-3 mb-3 bg-white shadow-sm position-relative" id="branch_card_{{ $bIdx + 1 }}">
+                                                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                                    <span class="badge bg-secondary branch-badge fw-bold">{{ $bAddr->address_type ?: 'Plant Location' }} #{{ $bIdx + 1 }}</span>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remove-branch" data-id="{{ $bIdx + 1 }}">
+                                                        <i class="fas fa-trash me-1"></i> Remove
+                                                    </button>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-md-4 mb-2">
+                                                        <label class="form-label small fw-bold">Branch / Plant Name <span class="text-danger">*</span></label>
+                                                        <input type="text" name="branch_type[]" class="form-control form-control-sm" value="{{ $bAddr->address_type ?: 'Plant / Factory' }}" placeholder="e.g. Hosur Plant, Coimbatore Site, Depot" required>
+                                                    </div>
+                                                    <div class="col-md-4 mb-2">
+                                                        <label class="form-label small fw-bold">State (for Tax Calculation)</label>
+                                                        <select name="branch_state_id[]" class="form-select form-select-sm">
+                                                            <option value="">-- State --</option>
+                                                            @foreach (App\Models\Statelist::get(['id', 'state']) as $s)
+                                                                <option value="{{ $s->id }}" {{ $bAddr->state_id == $s->id ? 'selected' : '' }}>{{ $s->state }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-4 mb-2">
+                                                        <label class="form-label small fw-bold">Location GSTIN (Optional)</label>
+                                                        <input type="text" name="branch_gst[]" class="form-control form-control-sm text-uppercase" value="{{ $bAddr->gst_number }}" placeholder="Same as customer if blank">
+                                                    </div>
+                                                    <div class="col-md-12 mb-2">
+                                                        <label class="form-label small fw-bold">Full Address Text <span class="text-danger">*</span></label>
+                                                        <textarea name="branch_address[]" class="form-control form-control-sm" rows="2" placeholder="Enter or paste full branch/plant delivery address text with city, pincode..." required>{{ $bAddr->address }}</textarea>
+                                                    </div>
+                                                    <div class="col-md-6 mb-1">
+                                                        <label class="form-label small text-muted">Contact Person (Optional)</label>
+                                                        <input type="text" name="branch_contact_person[]" class="form-control form-control-sm" value="{{ $bAddr->contact_person }}" placeholder="Site / Plant In-charge">
+                                                    </div>
+                                                    <div class="col-md-6 mb-1">
+                                                        <label class="form-label small text-muted">Contact Phone (Optional)</label>
+                                                        <input type="text" name="branch_contact_phone[]" class="form-control form-control-sm" value="{{ $bAddr->contact_number }}" placeholder="Phone">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                                <p class="text-muted small mb-0 fst-italic py-2" id="no_branch_text" style="{{ !empty($customerAddresses) && count($customerAddresses) > 0 ? 'display:none;' : '' }}">
+                                    <i class="fas fa-info-circle me-1"></i> No additional plant / site delivery addresses added yet. Click "<strong>+ Add Plant / Delivery Address</strong>" if this customer has multiple delivery locations or plant units under this GSTIN.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary m-auto d-block add-employee-btn my-3">Update Customer</button>
             </form>
@@ -646,5 +712,84 @@ function copyBillingAddress() {
     const billing = document.getElementById("cus-address").value;
     document.getElementById("cus_com_address").value = billing;
 }
+
+// Dynamic Additional Plant / Delivery Address Handling for Customer Edit
+let branchIndex = {{ !empty($customerAddresses) ? count($customerAddresses) : 0 }};
+const stateOptions = `<option value="">-- State --</option>@foreach (App\Models\Statelist::get(['id', 'state']) as $s)<option value="{{ $s->id }}">{{ $s->state }}</option>@endforeach`;
+
+$('#btnAddBranchAddress').on('click', function() {
+    branchIndex++;
+    $('#no_branch_text').hide();
+    let currentGst = ($('#cus-gst-number').val() || '').trim().toUpperCase();
+
+    let cardHtml = `
+        <div class="branch-card border rounded p-3 mb-3 bg-white shadow-sm position-relative" id="branch_card_${branchIndex}">
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                <span class="badge bg-secondary branch-badge fw-bold"><i class="fas fa-building me-1"></i> Extra Branch / Plant #${branchIndex}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2 btn-remove-branch" data-id="${branchIndex}">
+                    <i class="fas fa-trash me-1"></i> Remove
+                </button>
+            </div>
+            <div class="row">
+                <div class="col-md-4 mb-2">
+                    <label class="form-label small fw-bold">Branch / Plant Name <span class="text-danger">*</span></label>
+                    <input type="text" name="branch_type[]" class="form-control form-control-sm" placeholder="e.g. Hosur Plant, Coimbatore Site, Depot" required>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label small fw-bold">State (for Tax Calculation)</label>
+                    <select name="branch_state_id[]" class="form-select form-select-sm">
+                        ${stateOptions}
+                    </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label small fw-bold">Location GSTIN (Optional)</label>
+                    <input type="text" name="branch_gst[]" class="form-control form-control-sm text-uppercase" value="${currentGst}" placeholder="Same as customer if blank">
+                </div>
+                <div class="col-md-12 mb-2">
+                    <label class="form-label small fw-bold">Full Address Text <span class="text-danger">*</span></label>
+                    <textarea name="branch_address[]" class="form-control form-control-sm" rows="2" placeholder="Enter or paste full branch/plant delivery address text with city, pincode..." required></textarea>
+                </div>
+                <div class="col-md-6 mb-1">
+                    <label class="form-label small text-muted">Contact Person (Optional)</label>
+                    <input type="text" name="branch_contact_person[]" class="form-control form-control-sm" placeholder="Site / Plant In-charge">
+                </div>
+                <div class="col-md-6 mb-1">
+                    <label class="form-label small text-muted">Contact Phone (Optional)</label>
+                    <input type="text" name="branch_contact_phone[]" class="form-control form-control-sm" placeholder="Phone">
+                </div>
+            </div>
+        </div>
+    `;
+    $('#branch_address_container').append(cardHtml);
+});
+
+$(document).on('click', '.btn-remove-branch', function() {
+    let id = $(this).data('id');
+    $('#branch_card_' + id).remove();
+    if ($('#branch_address_container .branch-card').length === 0) {
+        $('#no_branch_text').show();
+    }
+});
+
+$(document).on('change', '.branch-state-select', function() {
+    let bId = $(this).data('id');
+    let stateId = $(this).val();
+    let $citySelect = $('#branch_city_' + bId);
+    $citySelect.empty().append('<option value="">-- Choose City --</option>');
+    if (stateId) {
+        $.ajax({
+            url: '/get-cities/' + stateId,
+            type: 'GET',
+            dataType: 'json',
+            success: function(cities) {
+                if (cities && cities.length > 0) {
+                    cities.forEach(function(c) {
+                        $citySelect.append(`<option value="${c.id}">${c.city_name || c.city || ''}</option>`);
+                    });
+                }
+            }
+        });
+    }
+});
 </script>
 @endsection

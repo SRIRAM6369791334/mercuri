@@ -237,12 +237,9 @@ class OrfappDataTable extends DataTable
      | ROLE BASED FILTER
      ------------------------------------------------- */
 
-    // 🔹 Design Engineer → ONLY Special products
-    // if ($role === 'Design Engineer') {
-    //     $query->where('cate.sub_category', 'special');
-    // }
-    if ($role === 'Super Admin') {
-        // no condition
+    // 🔹 Role check: Super Admin, Service Coordinator, CS have full access
+    if (in_array($role, ['Super Admin', 'Admin', 'Service Coordinator', 'CS', 'Cs'])) {
+        // no condition - can see all approved ORFs to process POs
     }
 
     // 🔹 Sales Manager → ONLY their own leads
@@ -255,13 +252,13 @@ class OrfappDataTable extends DataTable
         $query->where('cate.sub_category', 'special');
     }
 
-    // 🔹 Other roles → NO DATA
+    // 🔹 Other roles fallback
     else {
-        $query->whereRaw('1 = 0');
+        $query->where('leads.assigned_to', $user->id);
     }
 
     // Optional PO Status Filter
-    if (request()->filled('po_filter')) {
+    if (request()->filled('po_filter') && \Illuminate\Support\Facades\Schema::hasColumn('orf', 'po_status')) {
         $poFilter = request()->get('po_filter');
         if ($poFilter === 'pending') {
             $query->where(function ($q) {

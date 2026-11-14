@@ -7,7 +7,7 @@ use App\Models\Quotation;
 class QuotationRevisionHelper
 {
     /**
-     * Extract root base quotation number (e.g. 'MSE/2026/0032' from 'MSE/2026/0032(R1-2)').
+     * Extract root base quotation number (e.g. 'MSE/2026/0032' from 'MSE/2026/0032(R0)' or 'MSE/2026/0032(R1)').
      */
     public static function getBaseQuotationNo(string $quotaId): string
     {
@@ -23,10 +23,9 @@ class QuotationRevisionHelper
      *
      * Patterns:
      * - 'BASE'               => ['major' => 0, 'minor' => 0]
-     * - 'BASE(R0-2)'         => ['major' => 0, 'minor' => 2]
+     * - 'BASE(R0)'           => ['major' => 0, 'minor' => 0]
      * - 'BASE(R1)'           => ['major' => 1, 'minor' => 0]
-     * - 'BASE(R1-3)'         => ['major' => 1, 'minor' => 3]
-     * - 'BASE(2)' (fallback) => ['major' => 0, 'minor' => 2]
+     * - 'BASE(R1-2)'         => ['major' => 1, 'minor' => 2]
      *
      * @return array{major: int, minor: int}
      */
@@ -46,25 +45,18 @@ class QuotationRevisionHelper
 
         // Pattern: (Y)
         if (preg_match('/\((\d+)\)$/i', $trimmed, $m)) {
-            return ['major' => 0, 'minor' => (int) $m[1]];
+            return ['major' => (int) $m[1], 'minor' => 0];
         }
 
         return ['major' => 0, 'minor' => 0];
     }
 
     /**
-     * Format a quotation number given base, major, and minor.
+     * Format a quotation number given base and major revision.
+     * Always produces MSE/YYYY/XXXX(RX), e.g. MSE/2026/0032(R0), MSE/2026/0032(R1).
      */
-    public static function formatQuotaId(string $baseNo, int $major, int $minor): string
+    public static function formatQuotaId(string $baseNo, int $major, int $minor = 0): string
     {
-        if ($major === 0 && $minor === 0) {
-            return $baseNo;
-        }
-
-        if ($minor > 0) {
-            return "{$baseNo}(R{$major}-{$minor})";
-        }
-
         return "{$baseNo}(R{$major})";
     }
 
@@ -93,6 +85,27 @@ class QuotationRevisionHelper
     }
 
     /**
+     * Get the next revision number for a quotation when approved or sent to customer.
+     * E.g., if highest sibling is R0 -> returns 1 (R1).
+     */
+    public static function getNextRevisionNumber(Quotation $currentQuotation): int
+    {
+        $baseNo = self::getBaseQuotationNo($currentQuotation->quota_id);
+
+        $siblings = Quotation::where('quota_id', 'like', $baseNo . '%')->get();
+
+        $maxMajor = 0;
+        foreach ($siblings as $sib) {
+            $rev = self::parseRevision($sib->quota_id);
+            if ($rev['major'] > $maxMajor) {
+                $maxMajor = $rev['major'];
+            }
+        }
+
+        return $maxMajor + 1;
+    }
+
+    /**
      * Generate the next quotation revision number and components.
      *
      * @return array{quota_id: string, revision_major: int, revision_minor: int, is_external: bool}
@@ -101,50 +114,24 @@ class QuotationRevisionHelper
     {
         $baseNo = self::getBaseQuotationNo($currentQuotation->quota_id);
 
-        // Fetch all siblings sharing this base number
-        $siblings = Quotation::where('quota_id', 'like', $baseNo . '%')
-            ->orderBy('id', 'asc')
-            ->get();
-
-        $parsedCurrent = self::parseRevision($currentQuotation->quota_id);
-        $currentMajor = $parsedCurrent['major'];
-
         if ($qualifiesForExternal) {
-            // Find max major across all siblings
-            $maxMajor = 0;
-            foreach ($siblings as $sib) {
-                $rev = self::parseRevision($sib->quota_id);
-                if ($rev['major'] > $maxMajor) {
-                    $maxMajor = $rev['major'];
-                }
-            }
-
-            $nextMajor = max($maxMajor + 1, 1);
-            $nextMinor = 0;
+            $nextMajor = self::getNextRevisionNumber($currentQuotation);
 
             return [
-                'quota_id' => self::formatQuotaId($baseNo, $nextMajor, $nextMinor),
+                'quota_id' => self::formatQuotaId($baseNo, $nextMajor),
                 'revision_major' => $nextMajor,
-                'revision_minor' => $nextMinor,
+                'revision_minor' => 0,
                 'is_external' => true,
             ];
         }
 
-        // Internal Revision under $currentMajor
-        $maxMinor = 0;
-        foreach ($siblings as $sib) {
-            $rev = self::parseRevision($sib->quota_id);
-            if ($rev['major'] === $currentMajor && $rev['minor'] > $maxMinor) {
-                $maxMinor = $rev['minor'];
-            }
-        }
-
-        $nextMinor = $maxMinor + 1;
+        $parsedCurrent = self::parseRevision($currentQuotation->quota_id);
+        $currentMajor = $parsedCurrent['major'];
 
         return [
-            'quota_id' => self::formatQuotaId($baseNo, $currentMajor, $nextMinor),
+            'quota_id' => self::formatQuotaId($baseNo, $currentMajor),
             'revision_major' => $currentMajor,
-            'revision_minor' => $nextMinor,
+            'revision_minor' => 0,
             'is_external' => false,
         ];
     }

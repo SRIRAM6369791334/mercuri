@@ -143,19 +143,23 @@
                             </select>
                         </div>
                         <div class="form-group mt-4" id="designSpecField" style="display:none;">
-    <label class="form-label">
-        Design Specifications <span style="color:red">*</span>
-    </label>
+                            <label class="form-label fw-bold d-flex align-items-center justify-content-between mb-2">
+                                <span><i class="bi bi-sliders me-1 text-primary"></i> Design Specifications <span style="color:red">*</span></span>
+                            </label>
 
-    <div id="specificationWrapper"></div>
-</div>
+                            <div id="specificationWrapper" class="p-3 border rounded bg-light shadow-sm"></div>
+                        </div>
 
 
 
 
                         <div class="form-group mt-4" id="ganumberfield" >
-                            <label for="ga_number" class="form-label">GA Number </label>
-                            <input type="file" class="form-control" name="ga_number" id="ga_number" accept=".pdf, .docx, .jpg, .png" >
+                            <label for="ga_number" class="form-label">GA Drawing </label>
+                            <input type="file" class="form-control" name="ga_number" id="ga_number" accept=".pdf, .docx, .jpg, .png, .dwg" >
+                        </div>
+                        <div class="form-group mt-3" id="pitdrawingfield" >
+                            <label for="pit_drawing" class="form-label">Pit Drawing </label>
+                            <input type="file" class="form-control" name="pit_drawing" id="pit_drawing" accept=".pdf, .docx, .jpg, .png, .dwg" >
                         </div>
                         {{-- <div class="form-group mt-4" id="designinputField" style="display:none;">
                             <label for="Design" class="form-label"> Design Input</label>
@@ -283,16 +287,16 @@
                     @php
                         $todayDate = date('Y-m-d', strtotime('today'));
                     @endphp
-                    <div class="mb-3" id="convertedOptionsDiv" style="display: none;">
+                    <div class="mb-3" id="a_convertedOptionsDiv" style="display: none;">
                         <div class="form-group mt-4">
-                            <label for="converteddate" class="form-label">Converted Date <span style="color:red">*</span></label>
-                            <input type="date" class="form-control" name="converteddate" id="converteddate" value="{{ $todayDate }}" max="{{$todayDate}}" placeholder="">
+                            <label for="a_converteddate" class="form-label">Converted Date <span style="color:red">*</span></label>
+                            <input type="date" class="form-control" name="converteddate" id="a_converteddate" value="{{ $todayDate }}" max="{{$todayDate}}" placeholder="">
                         </div>
                         <div class="form-group mt-4">
-                            <label for="exampleFormControlInput1"
+                            <label for="a_catepro"
                                 class="form-label">Product Segment <span
                                 style="color:red">*</span></label>
-                                <select class="form-select " name="category" id="catepro" >
+                                <select class="form-select " name="category" id="a_catepro" >
                                     <option value=""> Choose Category </option>
                                     @if ($status = App\Models\ProductCategory::get())
                                     @foreach ($status as $data)
@@ -305,34 +309,38 @@
                                 </select>
                         </div>
                         <div class="form-group mt-4">
-                            <label for="exampleFormControlInput1"
+                            <label for="a_lead_sub_category_id"
                                 class="form-label">Product Group <span
                                 style="color:red">*</span></label>
-                                <select class="form-select " name="sub_category_id" id="lead_sub_category_id" >
+                                <select class="form-select " name="sub_category_id" id="a_lead_sub_category_id" >
                                     <option value=""> Choose Category </option>
 
 
                                 </select>
                         </div>
                         <div class="form-group mt-4">
-                            <label for="exampleFormControlInput1"
+                            <label for="a_pprod"
                                 class="form-label">Product Model<span
                                 style="color:red">*</span></label>
-                                <select class="form-select " name="products" id="pprod" >
+                                <select class="form-select " name="products" id="a_pprod" >
                                     <option value=""> Choose Product </option>
 
                                 </select>
                         </div>
                         <div class="form-group mt-4">
-                            <label for="quantity" class="form-label">Quantity <span style="color:red">*</span></label>
-                            <input type="number" class="form-control" name="quantity" id="quantity"  placeholder="Enter Quantity">
+                            <label for="a_quantity" class="form-label">Quantity <span style="color:red">*</span></label>
+                            <input type="number" class="form-control" name="quantity" id="a_quantity"  placeholder="Enter Quantity">
                         </div>
 
                         <div class="form-group mt-4">
-                            <label for="ga_number" class="form-label">GA Number </label>
-                            <input type="file" class="form-control" name="ga_number" id="ga_number" accept=".pdf, .docx, .jpg, .png" >
+                            <label for="a_ga_number" class="form-label">GA Drawing </label>
+                            <input type="file" class="form-control" name="ga_number" id="a_ga_number" accept=".pdf, .docx, .jpg, .png, .dwg" >
                         </div>
-                        <div class="form-group mt-4" id="specialField" style="display: none;">
+                        <div class="form-group mt-3">
+                            <label for="a_pit_drawing" class="form-label">Pit Drawing </label>
+                            <input type="file" class="form-control" name="pit_drawing" id="a_pit_drawing" accept=".pdf, .docx, .jpg, .png, .dwg" >
+                        </div>
+                        <div class="form-group mt-4" id="a_specialField" style="display: none;">
                             <label for="special_input" class="form-label">Assign Designer <span style="color:red">*</span></label>
                             <select class="form-select" name="assigndesign" id="special_input" >
                                 <option value="">Choose Designer</option>

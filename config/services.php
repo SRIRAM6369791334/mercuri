@@ -31,4 +31,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'gst_profile' => [
+        'key' => env('GST_PROFILE_API_KEY'),
+        'host' => env('GST_PROFILE_API_HOST', 'gst-return-status.p.rapidapi.com'),
+    ],
+
 ];

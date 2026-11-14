@@ -48,11 +48,16 @@ elseif ($role === 'Sales Manager') {
 /* -------------------------------------------------
  | COUNT & AMOUNTS
  ------------------------------------------------- */
+$hasPoStatusCol = \Illuminate\Support\Facades\Schema::hasColumn('orf', 'po_status');
 $orfApprovedCount = (clone $orfBaseQuery)->count();
-$orfPendingPoCount = (clone $orfBaseQuery)->where(function($q) {
-    $q->whereNull('orf.po_status')->orWhere('orf.po_status', '!=', 'released');
-})->count();
-$orfReleasedPoCount = (clone $orfBaseQuery)->where('orf.po_status', 'released')->count();
+$orfPendingPoCount = $hasPoStatusCol 
+    ? (clone $orfBaseQuery)->where(function($q) {
+        $q->whereNull('orf.po_status')->orWhere('orf.po_status', '!=', 'released');
+    })->count()
+    : $orfApprovedCount;
+$orfReleasedPoCount = $hasPoStatusCol 
+    ? (clone $orfBaseQuery)->where('orf.po_status', 'released')->count()
+    : 0;
 
 /* -------------------------------------------------
  | TOTAL AMOUNT

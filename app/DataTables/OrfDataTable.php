@@ -66,7 +66,7 @@ class OrfDataTable extends DataTable
                 }
                 $button = "<span class='badge badge-warning";
                 if (Auth::user()->role == 'Service Coordinator' || Auth::user()->role == 'Cs' || Auth::user()->role == 'Super Admin') {
-                    $button .= " orf-csstatus-btn' data-bs-toggle='modal' data-bs-target='#statusModalcs' data-appsta='{$query->approval_status}' data-rid='{$query->id}'";
+                    $button .= " orf-csstatus-btn' data-bs-toggle='modal' data-bs-target='#statusModalcs' data-appsta='{$query->approval_status}' data-rid='{$query->id}' data-quoproid='{$query->quoproid}' data-checkquotation='{$query->check_quotation}' data-checkorf='{$query->check_orf}'";
                 } else {
                     $button .= "'";
                 }
@@ -112,6 +112,7 @@ class OrfDataTable extends DataTable
                     data-bs-target='#statusModal'
                     data-cssta='{$query->cs_status}'
                     data-id='{$query->id}'
+                    data-sigdraw='{$query->sigdraw}'
                     style='background:#efa213;padding:8px;cursor:pointer'>
                     <i class='fas fa-hourglass-half'></i> Pending
                 </span>";
@@ -189,7 +190,10 @@ class OrfDataTable extends DataTable
                         data-bs-toggle='modal'
                         data-bs-target='#statusModalcs'
                         data-appsta='{$query->approval_status}'
-                        data-rid='{$query->id}'>
+                        data-rid='{$query->id}'
+                        data-quoproid='{$query->quoproid}'
+                        data-checkquotation='{$query->check_quotation}'
+                        data-checkorf='{$query->check_orf}'>
                         CS Approval
                     </a>";
     }
@@ -205,23 +209,16 @@ class OrfDataTable extends DataTable
                         data-bs-toggle='modal'
                         data-bs-target='#statusModal'
                         data-cssta='{$query->cs_status}'
-                        data-id='{$query->id}'>
+                        data-id='{$query->id}'
+                        data-sigdraw='{$query->sigdraw}'>
                         Sales Proceed
                     </a>";
-
-        if (Auth::user()->can('orf-approval-edit')) {
-            $editUrl = route('orf.edit', $query->id);
-            $action .= "<a class='btn btn-warning' href='{$editUrl}'>Edit</a>";
-        }
     }
 
-     if (
-        Auth::user()->role === 'Sales Manager' &&
-        $query->cs_status == 2 &&
-        Auth::user()->can('orf-approval-edit')
-    ) {
+    /* EDIT BUTTON */
+    if (Auth::user()->can('orf-edit') || Auth::user()->can('orf-approval-edit')) {
         $editUrl = route('orf.edit', $query->id);
-        $action .= "<a class='btn btn-warning' href='{$editUrl}'>Edit</a>";
+        $action .= "<a class='btn btn-warning mb-2' href='{$editUrl}'>Edit</a>";
     }
 
     $action .= "</div>";

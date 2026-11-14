@@ -108,27 +108,36 @@ class Product extends Model
     // when the purchase entry editing below function will be used
     public function updateStock($productId, $vendorId, $quantity, $remarks = 'Stock purchased', $peId = null, $oldProductId = null, $oldQty = null)
     {
+        StockMovement::where('pe_id', $peId)->update([
+            'product_id' => $productId,
+            'vendor_id' => $vendorId,
+            'type' => 'purchase',
+            'quantity' => $quantity,
+            'remarks' => $remarks,
+        ]);
 
-        $stockUpdate = StockMovement::where('pe_id', $peId);
+        $oldQty = (float) ($oldQty ?? 0);
+        $quantity = (float) ($quantity ?? 0);
 
-        $stockUpdate->product_id = $productId;
-        $stockUpdate->vendor_id = $vendorId;
-        $stockUpdate->type = 'purchase';
-        $stockUpdate->quantity = $quantity;
-        $stockUpdate->remarks = $remarks;
-        $stockUpdate->pe_id = $peId;
+        if ($oldProductId && $oldProductId != $productId) {
+            ProductStock::where('product_id', $oldProductId)
+                ->decrement('available_stock', $oldQty);
+            ProductStock::where('product_id', $oldProductId)
+                ->decrement('total_stock', $oldQty);
 
-        $stockUpdate->update();
-
-        ProductStock::updateOrCreate(
-            ['product_id' => $oldProductId],
-            ['available_stock' => DB::raw("available_stock - $oldQty"), 'total_stock' => DB::raw("total_stock - $oldQty")]
-        );
-
-        ProductStock::updateOrCreate(
-            ['product_id' => $productId],
-            ['available_stock' => DB::raw("available_stock + $quantity"), 'total_stock' => DB::raw("total_stock + $quantity")]
-        );
+            ProductStock::updateOrCreate(
+                ['product_id' => $productId],
+                ['available_stock' => DB::raw("available_stock + $quantity"), 'total_stock' => DB::raw("total_stock + $quantity")]
+            );
+        } else {
+            $diff = $quantity - $oldQty;
+            if ($diff != 0) {
+                ProductStock::updateOrCreate(
+                    ['product_id' => $productId],
+                    ['available_stock' => DB::raw("available_stock + ($diff)"), 'total_stock' => DB::raw("total_stock + ($diff)")]
+                );
+            }
+        }
     }
 
     public function reduceStock($productId, $quantity, $remarks = 'Stock used')
@@ -144,8 +153,9 @@ class Product extends Model
             ->decrement('available_stock', $quantity);
     }
 
-    public function deleteStock($productId, $quantity, $remarks = 'PE Delete',)
+    public function deleteStock($productId, $quantity, $remarks = 'PE Delete')
     {
+        $quantity = (float) $quantity;
         StockMovement::create([
             'product_id' => $productId,
             'type' => 'sale',
@@ -155,6 +165,8 @@ class Product extends Model
 
         ProductStock::where('product_id', $productId)
             ->decrement('available_stock', $quantity);
+        ProductStock::where('product_id', $productId)
+            ->decrement('total_stock', $quantity);
     }
 
     public function adjustStock($productId, $quantity, $remarks = 'Stock adjusted')

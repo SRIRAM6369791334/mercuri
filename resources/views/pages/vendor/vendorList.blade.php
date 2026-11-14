@@ -60,22 +60,21 @@
                             @endphp
                             @foreach ($vendors as $key => $data)
                                 @php
-                                    $i = 1;
-                                    $stateName = $data->stateData->state;
-                                    $cityName = $data->cityData->city_name;
+                                    $stateName = $data->stateData?->state ?? '-';
+                                    $cityName = $data->cityData?->city_name ?? '-';
                                 @endphp
                                 <tr>
                                     <td>{{ $key + 1 }}</td>
-                                    <td>{{ $data->company_name }}</td>
+                                    <td>{{ $data->company_name ?? '-' }}</td>
                                     <td>{{ $stateName }}</td>
                                     <td>{{ $cityName }}</td>
-                                    <td>{{ $data->point_of_contact }}</td>
-                                    <td>{{ $data->contact_number }}</td>
-                                    <td>{{ $data->gst_number }}</td>
+                                    <td>{{ $data->point_of_contact ?? '-' }}</td>
+                                    <td>{{ $data->contact_number ?? '-' }}</td>
+                                    <td>{{ $data->gst_number ?? '-' }}</td>
                                     <td>
-                                        <span class="badge @if ($data->vendor_status == "active")
+                                        <span class="badge @if (($data->vendor_status ?? 'active') == 'active')
                                             bg-success @else bg-danger
-                                        @endif">{{ ucfirst($data->vendor_status) }}</span>
+                                        @endif">{{ ucfirst($data->vendor_status ?: 'active') }}</span>
                                     </td>
                                     @canany(['vendors-edit', 'vendors-delete'])
                                         <td>
@@ -85,8 +84,10 @@
                                                             class="btn btn-info me-2">Edit</button></a>
                                                 @endcan
                                                 @can('vendors-delete')
-                                                    <button data-url="/delete-vendors/{{ $data->id }}"
-                                                        class="btn btn-danger common-delete-btn">Delete</button>
+                                                    <form method="POST" action="/delete-vendors/{{ $data->id }}" onsubmit="return confirm('Soft-delete this supplier?');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                                    </form>
                                                 @endcan
                                             </div>
                                         </td>

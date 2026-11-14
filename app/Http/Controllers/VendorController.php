@@ -11,6 +11,8 @@ use App\Models\Vendor;
 use Illuminate\Http\Request;
 use App\DataTables\VendorDataTable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class VendorController extends Controller
 {
@@ -21,181 +23,203 @@ class VendorController extends Controller
 
     public function saveVendors(Request $request)
     {
-        $vendor = new Vendor();
+        $data = $request->validate($this->vendorRules());
+        $this->validateVendorLocations($request);
+        $vendor = DB::transaction(function () use ($data, $request) {
+            $nextNumber = ((int) Vendor::withTrashed()->lockForUpdate()->max('id')) + 1;
+            do {
+                $vendorCode = sprintf('MIS-VEN-%03d', $nextNumber++);
+            } while (Vendor::withTrashed()->where('vendor_id', $vendorCode)->exists());
 
-        $vendor->company_name = $request->input('company_name');
-        $vendor->alternate_name = $request->input('alternate_name');
-        $vendor->point_of_contact = $request->input('poc_name');
-        $vendor->contact_number = $request->input('contact_number');
-        $vendor->email = $request->input('email');
-        $vendor->gst_number = $request->input('gst_number');
-        $vendor->address = $request->input('address');
-        $vendor->country_id = $request->input('country_id');
-        $vendor->state_id = $request->input('state_id');
-        $vendor->city_id = $request->input('city_id');
-        $vendor->postal_code = $request->input('postal_code');
-        $vendor->vendor_status = $request->input('vendor_status');
-        $vendor->product_cat_id = json_encode($request->input('pro_cat_id'), true);
+            $vendor = Vendor::create($this->vendorAttributes($data, $vendorCode));
+            $this->syncBranches($vendor, $request);
+            $this->syncCategories($vendor, $data['pro_cat_id'] ?? []);
 
+            return $vendor;
+        });
 
-
-        // to generate vendorId
-        function incrementCode($code)
-        {
-            // Split the code into parts
-            $parts = explode('-', $code);
-
-            // Get the numeric part and increment it
-            $number = (int) $parts[2] + 1;
-
-            // Format back with leading zeros
-            return sprintf('%s-%s-%03d', $parts[0], $parts[1], $number);
-        }
-
-        $lastInserted = Vendor::latest()->first();
-
-        if ($lastInserted == null) {
-            $vendorId = incrementCode("MIS-VEN-000");
-        } else {
-            $vendorId = incrementCode($lastInserted->vendor_id);
-        }
-
-
-        $vendor->vendor_id = $vendorId;
-
-        $isVendorInsert = $vendor->save();
-        $lastInserted = Vendor::latest()->first();
-
-
-
-        // to find existing category to insert vendorid
-
-        foreach ($request->input('pro_cat_id') as $key => $value) {
-            $category = ProductCategory::find($value);
-            $vendorIdArray = [];
-            if ($isVendorInsert) {
-                if ($category->vendor_id == null) {
-                    array_push($vendorIdArray, (int) $lastInserted->id);
-                } else {
-                    $vendorIdArray = json_decode($category->vendor_id);
-                    array_push($vendorIdArray, $lastInserted->id);
-                }
-                $category->vendor_id = json_encode($vendorIdArray);
-                $category->update();
-
-
-            } else {
-
-            }
-        }
-
-        if ($isVendorInsert) {
-            return redirect()->route('pages.vendor.vendorList')->with('success', 'Vendor Details successfully!');
-        } else {
-            return redirect()->route('pages.vendor.addVendors')->with('error', 'Something went wrong, Please try again');
-        }
-
+        return redirect()->route('pages.vendor.vendorList')->with('success', 'Vendor Details successfully!');
     }
 
     public function vendorEditDetails($vendorId)
     {
-        $vendorDetails = Vendor::where('id', $vendorId)->first();
+        $vendorDetails = Vendor::findOrFail($vendorId);
+        $vendorAddresses = \App\Models\VendorAddress::with('city')->where('vendor_id', $vendorId)->get();
 
-        // dd($vendorDetails);
-
-        return view('pages.vendor.editVendors', compact('vendorDetails'));
+        return view('pages.vendor.editVendors', compact('vendorDetails', 'vendorAddresses'));
     }
 
     public function editVendors(Request $request)
     {
-        $vendorId = $request->vendorId;
-        $vendor = Vendor::findOrFail($request->vendorId);
+        $vendor = Vendor::findOrFail($request->input('vendorId'));
+        $data = $request->validate($this->vendorRules($vendor->id));
+        $this->validateVendorLocations($request);
 
-        if ($vendor) {
-            $vendor->company_name = $request->input('company_name');
-            $vendor->alternate_name = $request->input('alternate_name');
-            $vendor->point_of_contact = $request->input('poc_name');
-            $vendor->contact_number = $request->input('contact_number');
-            $vendor->email = $request->input('email');
-            $vendor->gst_number = $request->input('gst_number');
-            $vendor->address = $request->input('address');
-            $vendor->country_id = $request->input('address');
-            $vendor->state_id = $request->input('state_id');
-            $vendor->city_id = $request->input('city_id');
-            $vendor->postal_code = $request->input('postal_code');
-            $vendor->vendor_status = $request->input('vendor_status');
-            $vendor->product_cat_id = json_encode($request->input('pro_cat_id'), true);
+        DB::transaction(function () use ($vendor, $request, $data) {
+            $vendor->fill($this->vendorAttributes($data, $vendor->vendor_id))->save();
+            $this->syncBranches($vendor, $request);
+            $this->syncCategories($vendor, $data['pro_cat_id'] ?? []);
+        });
 
-            $isVendorInsert = $vendor->update();
-
-            // to find existing category to insert vendorid
-
-            // dd($request->input('pro_cat_id'));
-
-            foreach ($request->input('pro_cat_id') as $key => $value) {
-                $category = ProductCategory::find($value);
-
-                if ($category) {
-                    $vendorIdArray = [];
-
-                    if ($isVendorInsert) {
-                        // Decode existing vendor_id JSON into an array if not null
-                        if (!empty($category->vendor_id)) {
-                            $vendorIdArray = json_decode($category->vendor_id, true);
-                        }
-
-                        // Ensure $vendorId is not already in the array before adding it
-                        if (!in_array((int) $vendorId, $vendorIdArray)) {
-                            $vendorIdArray[] = (int) $vendorId; // Add only if it does not exist
-                        }
-
-                        // dd($vendorIdArray);
-
-                        // Update the vendor_id field with the new array
-                        $category->vendor_id = json_encode($vendorIdArray);
-                        $category->update();
-                    }
-                }
-            }
-
-
-            if ($isVendorInsert) {
-                return redirect()->route('pages.vendor.vendorList')->with('success', 'Vendor Details successfully!');
-            } else {
-                return redirect()->route('pages.vendor.addVendors')->with('error', 'Something went wrong, Please try again');
-            }
-        } else {
-            return back()->with('error', "Vendor not found");
-        }
-
+        return redirect()->route('pages.vendor.vendorList')->with('success', 'Vendor Details successfully!');
     }
 
     public function deleteVendor($vendorId)
     {
-        $deleteData = Vendor::find($vendorId)->delete();
-        $vendorIds = json_decode($vendorId, true);
-        $categories = ProductCategory::whereJsonContains('vendor_id', $vendorIds)->get();
+        $vendor = Vendor::findOrFail($vendorId);
+        DB::transaction(function () use ($vendor) {
+            $vendor->delete();
+            $vendor->addresses()->delete();
+            $this->syncCategories($vendor, []);
+        });
 
-        foreach ($categories as $category) {
-            $vendorIds = json_decode($category->vendor_id, true); // Decode JSON
+        return back()->with('delete-success', 'Vendor details deleted successfully');
+    }
 
-            // Remove the vendor ID from the array
-            $vendorIds = array_filter($vendorIds, fn($id) => $id != $vendorId);
+    private function vendorRules(?int $vendorId = null): array
+    {
+        return [
+            'vendorId' => $vendorId ? 'required|integer|exists:vendor_details_tb,id' : 'prohibited',
+            'company_name' => 'required|string|min:2|max:255',
+            'alternate_name' => 'nullable|string|max:255',
+            'poc_name' => 'nullable|string|max:255',
+            'contact_number' => ['nullable', 'regex:/^[0-9+()\\s.-]{7,20}$/'],
+            'email' => 'nullable|email|max:255',
+            'gst_number' => ['required', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/i'],
+            'address' => 'required|string|min:5|max:5000',
+            'country_id' => 'required|integer|exists:countries,id',
+            'state_id' => 'required|integer|exists:state_list,id',
+            'city_id' => 'nullable|integer|exists:city_list,id',
+            'postal_code' => 'nullable|string|max:20',
+            'vendor_status' => 'required|in:active,inactive',
+            'pro_cat_id' => 'required|array|min:1',
+            'pro_cat_id.*' => 'required|integer|distinct|exists:product_categories_tb,id',
+            'branch_id' => 'nullable|array',
+            'branch_id.*' => 'nullable|integer|exists:vendor_addresses,id',
+            'branch_address' => 'nullable|array',
+            'branch_address.*' => 'nullable|string|max:5000',
+            'branch_type' => 'nullable|array',
+            'branch_type.*' => 'nullable|string|max:50',
+            'branch_gst' => 'nullable|array',
+            'branch_gst.*' => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/i'],
+            'branch_state_id' => 'nullable|array',
+            'branch_state_id.*' => 'nullable|integer|exists:state_list,id',
+            'branch_city_id' => 'nullable|array',
+            'branch_city_id.*' => 'nullable|integer|exists:city_list,id',
+            'branch_pincode' => 'nullable|array',
+            'branch_pincode.*' => 'nullable|string|max:20',
+            'branch_contact_person' => 'nullable|array',
+            'branch_contact_person.*' => 'nullable|string|max:100',
+            'branch_contact_phone' => 'nullable|array',
+            'branch_contact_phone.*' => ['nullable', 'regex:/^[0-9+()\\s.-]{7,20}$/'],
+        ];
+    }
 
-            if (empty($vendorIds)) {
-                // If no vendors left, delete the row
-                $category->vendor_id = null;
-                $category->save();
-            } else {
-                // Otherwise, update the column with the new JSON array
-                $category->vendor_id = json_encode(array_values($vendorIds)); // Reindex array
-                $category->save();
+    private function vendorAttributes(array $data, string $vendorCode): array
+    {
+        return [
+            'vendor_id' => $vendorCode,
+            'company_name' => $data['company_name'],
+            'alternate_name' => $data['alternate_name'] ?? substr($data['company_name'], 0, 15),
+            'point_of_contact' => $data['poc_name'] ?? $data['company_name'],
+            'contact_number' => $data['contact_number'] ?? '0000000000',
+            'email' => $data['email'] ?? 'vendor@mercuriis.com',
+            'gst_number' => strtoupper($data['gst_number']),
+            'address' => $data['address'],
+            'country_id' => $data['country_id'],
+            'state_id' => $data['state_id'],
+            'city_id' => $data['city_id'] ?? null,
+            'postal_code' => $data['postal_code'] ?? null,
+            'vendor_status' => $data['vendor_status'],
+            'product_cat_id' => json_encode(array_values($data['pro_cat_id'] ?? [])),
+        ];
+    }
+
+    private function validateVendorLocations(Request $request): void
+    {
+        $errors = [];
+        if ($request->filled('city_id') &&
+            !DB::table('city_list')->where('id', $request->input('city_id'))
+                ->where('state_code', $request->input('state_id'))->exists()) {
+            $errors['city_id'] = 'Choose a city that belongs to the selected state.';
+        }
+
+        foreach (is_array($request->input('branch_city_id', [])) ? $request->input('branch_city_id', []) : [] as $index => $cityId) {
+            if (!$cityId) {
+                continue;
+            }
+            $stateId = $request->input("branch_state_id.$index");
+            if (!$stateId || !DB::table('city_list')->where('id', $cityId)->where('state_code', $stateId)->exists()) {
+                $errors["branch_city_id.$index"] = 'Choose a branch city that belongs to the selected branch state.';
             }
         }
-        if ($deleteData) {
-            return back()->with('delete-success', 'Vendor details deleted successfully');
-        } else {
-            return back()->with('delete-error', 'Something went wrong');
+
+        $addressKeys = array_keys(is_array($request->input('branch_address')) ? $request->input('branch_address') : []);
+        foreach (['branch_id', 'branch_type', 'branch_gst', 'branch_state_id', 'branch_city_id', 'branch_pincode', 'branch_contact_person', 'branch_contact_phone'] as $field) {
+            if ($request->exists($field) && (!is_array($request->input($field)) || array_keys($request->input($field)) !== $addressKeys)) {
+                $errors[$field] = 'Branch fields must contain matching rows.';
+            }
+        }
+
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+    }
+
+    private function syncBranches(Vendor $vendor, Request $request): void
+    {
+        $ids = [];
+        foreach (($request->input('branch_address') ?? []) as $index => $address) {
+            $branchId = $request->input("branch_id.$index");
+            $branch = null;
+            if ($branchId) {
+                $branch = $vendor->addresses()->whereKey($branchId)->first();
+                if (!$branch) {
+                    abort(422, 'A submitted supplier branch does not belong to this supplier.');
+                }
+            }
+
+            if (!trim((string) $address)) {
+                if ($branch) {
+                    $branch->delete();
+                }
+                continue;
+            }
+
+            $attributes = [
+                'address_type' => $request->input("branch_type.$index") ?: 'Branch #' . ($index + 1),
+                'address' => trim($address),
+                'gst_number' => strtoupper($request->input("branch_gst.$index") ?: $vendor->gst_number),
+                'country_id' => $request->input('country_id', 76),
+                'state_id' => $request->input("branch_state_id.$index") ?: $vendor->state_id,
+                'city_id' => $request->input("branch_city_id.$index") ?: $vendor->city_id,
+                'postal_code' => $request->input("branch_pincode.$index") ?: $vendor->postal_code,
+                'contact_person' => $request->input("branch_contact_person.$index"),
+                'contact_number' => $request->input("branch_contact_phone.$index"),
+            ];
+            if ($branch) {
+                $branch->update($attributes);
+            } else {
+                $branch = $vendor->addresses()->create($attributes);
+            }
+            $ids[] = $branch->id;
+        }
+
+        $vendor->addresses()->whereNotIn('id', $ids)->delete();
+    }
+
+    private function syncCategories(Vendor $vendor, array $selectedIds): void
+    {
+        $selectedIds = array_map('intval', $selectedIds);
+        foreach (ProductCategory::all() as $category) {
+            $vendorIds = json_decode($category->vendor_id, true) ?: [];
+            $vendorIds = array_map('intval', $vendorIds);
+            $vendorIds = array_values(array_filter($vendorIds, fn ($id) => $id !== (int) $vendor->id));
+            if (in_array((int) $category->id, $selectedIds, true)) {
+                $vendorIds[] = (int) $vendor->id;
+            }
+            $category->vendor_id = $vendorIds ? json_encode(array_values(array_unique($vendorIds))) : null;
+            $category->save();
         }
     }
 

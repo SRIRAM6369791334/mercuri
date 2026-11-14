@@ -13,7 +13,7 @@ class Orf extends Model
 
     protected $fillable = [
         'tranref','quoproid' , 'leano', 'quono', 'custo', 'specialproduct','quotadate', 'orfref', 'orfdate',
-        'cusporef', 'podate', 'attcuspo', 'approval_status', 'cs_status', 'reject_remark', 'csreject_remark','sigdraw', 'crddate', 'specialins',
+        'cusporef', 'podate', 'check_po', 'check_drawing', 'check_commercial', 'check_quotation', 'check_orf', 'attcuspo', 'approval_status', 'cs_status', 'reject_remark', 'csreject_remark','sigdraw', 'crddate', 'specialins',
         'po_status', 'supplier_po_no', 'po_released_at'
     ];
 

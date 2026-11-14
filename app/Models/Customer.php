@@ -44,6 +44,18 @@ class Customer extends Model
         return $this->city;
     }
 
+    public function getStateNameAttribute()
+    {
+        if (empty($this->state)) {
+            return null;
+        }
+        if (is_numeric($this->state)) {
+            $state = \Illuminate\Support\Facades\DB::table('state_list')->where('id', $this->state)->first();
+            return $state ? ($state->state ?? $state->state_name ?? $this->state) : $this->state;
+        }
+        return $this->state;
+    }
+
     public function getLocationDisplayAttribute()
     {
         $city = $this->city_name;
@@ -59,5 +71,10 @@ class Customer extends Model
             return $pin;
         }
         return '-';
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(CustomerAddress::class, 'customer_id', 'id');
     }
 }

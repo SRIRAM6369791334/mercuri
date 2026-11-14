@@ -33,6 +33,54 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
     <link href="https://cdn.datatables.net/2.2.2/css/dataTables.dataTables.min.css" rel="stylesheet" />
 
+    <style>
+        .quotation-table .select2-container {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .quotation-table .select2-selection--single {
+            height: 32px !important;
+            display: flex !important;
+            align-items: center !important;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+        }
+        .quotation-table .select2-selection__rendered {
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            padding-right: 20px !important;
+            width: 260px !important;
+            max-width: 260px !important;
+            font-size: 12px;
+        }
+        .quotation-table .select2-selection__arrow {
+            height: 32px !important;
+        }
+        .quotation-table td {
+            vertical-align: middle !important;
+        }
+        .quotation-table .select2-dropdown,
+        .select2-container--open .select2-dropdown {
+            max-width: 320px !important;
+            font-size: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            border: 1px solid #cbd5e1;
+        }
+        .quotation-table .select2-dropdown {
+            width: 280px !important;
+            max-width: 280px !important;
+        }
+        .quotation-table .select2-results__option,
+        .select2-results__option {
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.35 !important;
+            font-size: 12px !important;
+            padding: 6px 10px !important;
+        }
+    </style>
+
     <!-- Lottie animation Js -->
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 
@@ -867,10 +915,36 @@ $(document).ready(function () {
             $(document).on('click', '.orf-status-btn', function () {
                 var leadId = $(this).data('id');
                 var cssta = $(this).data('cssta');
+                var sigdraw = $(this).data('sigdraw');
+
                 $('#orfid').val(leadId);
                 $('#cssta').val(cssta);
-                $('.approval-check').prop('checked', false);
-                $('#statusModale').modal('show');
+
+                // Reset standard verification checkboxes
+                $('#sales_check_po, #sales_check_commercial').prop('checked', false);
+
+                // Drawing check auto-bypass for standard products with no drawing
+                if (!sigdraw || sigdraw === '' || sigdraw === 'null' || sigdraw === undefined) {
+                    $('#sales_check_drawing').prop('checked', true).prop('disabled', true);
+                    $('#sales_check_drawing_value').val('1');
+                    $('#drawing_not_required_badge').show();
+                    $('#sales_drawing_label').hide();
+                } else {
+                    $('#sales_check_drawing').prop('checked', false).prop('disabled', false);
+                    $('#sales_check_drawing_value').val('0');
+                    $('#drawing_not_required_badge').hide();
+                    $('#sales_drawing_label').show();
+                }
+
+                $('#sales_check_drawing').off('change.checklist').on('change.checklist', function () {
+                    $('#sales_check_drawing_value').val(this.checked ? '1' : '0');
+                });
+
+                if ($('#statusModal').length) {
+                    $('#statusModal').modal('show');
+                } else {
+                    $('#statusModale').modal('show');
+                }
             });
 
             $('#approval_status').on('change', function () {
@@ -884,13 +958,17 @@ $(document).ready(function () {
 
             $('#orfstatus').on('submit', function (e) {
                 e.preventDefault();
-                if (!$('.approval-check:checked').length || $('.approval-check:checked').length !== $('.approval-check').length) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Checklist Required',
-                        text: 'Verify PO, Drawing, Quotation, and ORF before approval.'
-                    });
-                    return;
+                if ($('#approval_status').val() == '1') {
+                    let requiredChecks = $('.approval-check:not(:disabled)');
+                    let checkedRequired = requiredChecks.filter(':checked');
+                    if (checkedRequired.length !== requiredChecks.length) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Checklist Required',
+                            text: 'Verify PO, Drawing (if required), and Commercial details before approval.'
+                        });
+                        return;
+                    }
                 }
                 let submitButton = $(this).find('button[type="submit"]');
                 $.ajax({
@@ -912,7 +990,7 @@ $(document).ready(function () {
                                 timer: 2000,
                                 showConfirmButton: false
                             });
-                            $('#statusModale').modal('hide');
+                            $('#statusModal').modal('hide');
                             $('#orf').DataTable().ajax.reload();
                         } else {
                             Swal.fire({
@@ -927,7 +1005,7 @@ $(document).ready(function () {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: 'An error occurred while updating.'
+                            text: xhr.responseJSON?.message || 'An error occurred while updating.'
                         });
                         submitButton.prop('disabled', false).text("Submit");
                     }
@@ -943,9 +1021,24 @@ $(document).ready(function () {
             $(document).on('click', '.orf-csstatus-btn', function () {
                 var leadId = $(this).data('rid');
                 var appsta = $(this).data('appsta'); // Fix: Use correct data attribute
+                var quoproid = $(this).data('quoproid');
+                var checkQuotation = $(this).data('checkquotation');
+                var checkOrf = $(this).data('checkorf');
+
                 $('#orfidcs').val(leadId);
                 $('#appsta').val(appsta);
-                $('.cs-approval-check').prop('checked', false);
+
+                $('#cs_check_quotation').prop('checked', checkQuotation == 1);
+                $('#cs_check_orf').prop('checked', checkOrf == 1);
+
+                if (quoproid) {
+                    $('#cs_view_quotation').attr('href', '/quotation/view/' + quoproid).show();
+                    $('#cs_view_orf').attr('href', '/orfdetail/view/' + quoproid).show();
+                } else {
+                    $('#cs_view_quotation').hide();
+                    $('#cs_view_orf').hide();
+                }
+
                 $('#statusModalcs').modal('show');
             });
 
@@ -960,14 +1053,6 @@ $(document).ready(function () {
 
             $('#orfcsstatus').on('submit', function (e) {
                 e.preventDefault();
-                if (!$('.cs-approval-check:checked').length || $('.cs-approval-check:checked').length !== $('.cs-approval-check').length) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Checklist Required',
-                        text: 'Verify PO, Drawing, Quotation, and ORF before approval.'
-                    });
-                    return;
-                }
                 let submitButton = $(this).find('button[type="submit"]');
                 $.ajax({
                     url: updateCsStatusUrl,
@@ -1649,6 +1734,7 @@ function loadProductsByCategory(categorySelect) {
     let categoryId = categorySelect.value;
     let row = categorySelect.closest('tr');
     let productSelect = row.querySelector('.productSelect');
+    if (!productSelect) return;
     let selectedProductId = productSelect.dataset.selected; // 👈 KEY
     let subCategoryId = categorySelect.dataset.subCategoryId || row.dataset.subCategoryId || '';
 
@@ -1669,10 +1755,16 @@ function loadProductsByCategory(categorySelect) {
                 let option = document.createElement('option');
                 option.value = product.id;
                 option.textContent = product.productname;
+                option.title = product.productname;
 
-                option.dataset.partno = product.partno;
-                option.dataset.rate   = product.rate;
-                option.dataset.tax    = product.gst;
+                option.dataset.model = shortModel;
+                option.dataset.name = product.productname;
+                option.dataset.search = (product.productmodel || '') + ' ' + (product.productname || '');
+                option.dataset.partno = product.partno || '';
+                option.dataset.rate   = product.rate || 0;
+                option.dataset.tax    = product.gst || 18;
+                option.dataset.hsn    = product.hsn || '8428';
+                option.dataset.desc   = product.productdes || product.productname || '';
                 option.dataset.dispatchTime = product.dispatch_time || '';
                 option.dataset.alloDis = product.allo_dis || '';
 
@@ -1692,13 +1784,19 @@ function loadProductsByCategory(categorySelect) {
                 let selectedOpt = productSelect.options[productSelect.selectedIndex];
                 if (selectedOpt && selectedOpt.value) {
                     let partNoInput = row.querySelector('input[name="part_no[]"]');
+                    let hsnInput = row.querySelector('.hsn') || row.querySelector('input[name="hsn[]"]');
                     let rateInput = row.querySelector('.rate');
+                    let baseRateInput = row.querySelector('.base-rate');
                     let taxInput = row.querySelector('.tax');
+                    let descInput = row.querySelector('.pro_des') || row.querySelector('input[name="pro_des[]"]');
                     let qtyInput = row.querySelector('.qty');
 
+                    if (baseRateInput) baseRateInput.value = selectedOpt.dataset.rate || '';
                     if (partNoInput) partNoInput.value = selectedOpt.dataset.partno || '';
-                    if (rateInput) rateInput.value = selectedOpt.dataset.rate || '';
+                    if (hsnInput && !hsnInput.value) hsnInput.value = selectedOpt.dataset.hsn || '8428';
+                    if (rateInput && (!rateInput.value || rateInput.value == '0' || rateInput.value == '0.00')) rateInput.value = selectedOpt.dataset.rate || '';
                     if (taxInput) taxInput.value = selectedOpt.dataset.tax || '';
+                    if (descInput) descInput.value = selectedOpt.dataset.desc || selectedOpt.title || '';
                     if (qtyInput && (!qtyInput.value || qtyInput.value == '0')) {
                         qtyInput.value = 1;
                     }
@@ -1708,6 +1806,9 @@ function loadProductsByCategory(categorySelect) {
                 }
                 $(productSelect).trigger('change');
                 $(productSelect).trigger('change.select2');
+                if (typeof fetchAccessoriesForRow === 'function') {
+                    fetchAccessoriesForRow($(row), selectedProductId);
+                }
             }
 
             updateLeadTimeFromCategories();
@@ -1717,22 +1818,25 @@ function loadProductsByCategory(categorySelect) {
 <script>
 function initProductSearch(select) {
     if (!select) return;
-    if ($(select).hasClass("select2-hidden-accessible")) {
-        $(select).select2('destroy');
+    let $sel = $(select);
+    if ($sel.hasClass("select2-hidden-accessible")) {
+        $sel.select2('destroy');
     }
 
-    $(select).select2({
-        placeholder: "Search Product",
+    $sel.select2({
+        placeholder: "Select Product",
         allowClear: true,
         width: '100%',
-        dropdownParent: $(select).closest('td'), // important for table
-        matcher: typeof window.multiKeywordMatcher === 'function' ? window.multiKeywordMatcher : undefined
+        dropdownParent: $sel.closest('td')
     });
 }
 
 // Init search when products are loaded
 document.addEventListener('change', function (e) {
     if (e.target.classList.contains('categorySelect')) {
+        if (e.target.closest('#poQuotationTable') || document.getElementById('poQuotationTable')) {
+            return;
+        }
 
         let row = e.target.closest('tr');
         let productSelect = row.querySelector('.productSelect');
@@ -1746,6 +1850,9 @@ document.addEventListener('change', function (e) {
 
 // Init for edit mode (already selected category)
 document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('poQuotationTable')) {
+        return;
+    }
     document.querySelectorAll('.productSelect').forEach(select => {
         initProductSearch(select);
     });
@@ -1756,6 +1863,9 @@ document.addEventListener('DOMContentLoaded', function () {
 <script>
 document.addEventListener('change', function (e) {
     if (e.target.classList.contains('categorySelect')) {
+        if (e.target.closest('#poQuotationTable') || document.getElementById('poQuotationTable')) {
+            return;
+        }
         loadProductsByCategory(e.target);
         updateLeadTimeFromCategories();
     }
@@ -1763,6 +1873,9 @@ document.addEventListener('change', function (e) {
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById('poQuotationTable')) {
+        return;
+    }
 
     document.querySelectorAll('.categorySelect').forEach(select => {
         if (select.value) {
@@ -1777,12 +1890,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
 $(document).on('change', '.productSelect', function () {
+    if ($(this).closest('#poQuotationTable').length) {
+        return;
+    }
     updateLeadTimeFromCategories();
 });
 </script>
 
 <script>
 $(document).on('select2:select', '.productSelect', function (e) {
+    if ($(this).closest('#poQuotationTable').length) {
+        return;
+    }
 
     let row = $(this).closest('tr');
     let selectedOption = e.params.data.element;
@@ -1792,14 +1911,24 @@ $(document).on('select2:select', '.productSelect', function (e) {
         selectedOption.dataset.partno || ''
     );
 
-    // ✅ Auto-fill Rate
-    row.find('.rate').val(
-        selectedOption.dataset.rate || ''
+    // ✅ Auto-fill HSN
+    row.find('.hsn, input[name="hsn[]"]').val(
+        selectedOption.dataset.hsn || '8428'
     );
+
+    // ✅ Auto-fill Rate
+    let prodRate = selectedOption.dataset.rate || '';
+    row.find('.rate').val(prodRate);
+    row.find('.base-rate').val(prodRate);
 
     // ✅ Auto-fill Tax
     row.find('.tax').val(
         selectedOption.dataset.tax || ''
+    );
+
+    // ✅ Auto-fill Description
+    row.find('.pro_des, input[name="pro_des[]"]').val(
+        selectedOption.dataset.desc || selectedOption.title || ''
     );
 
     let qtyInput = row.find('.qty');
@@ -1810,6 +1939,14 @@ $(document).on('select2:select', '.productSelect', function (e) {
     // Trigger recalculation
     qtyInput.trigger('input');
     updateLeadTimeFromCategories();
+
+    // ✅ Automatically fetch mapped accessories
+    if (typeof fetchAccessoriesForRow === 'function') {
+        let selectedId = $(this).val() || (e.params && e.params.data ? e.params.data.id : null);
+        if (selectedId) {
+            fetchAccessoriesForRow(row, selectedId);
+        }
+    }
 });
 </script>
 
@@ -1820,8 +1957,10 @@ $(document).on('select2:select', '.productSelect', function (e) {
 document.addEventListener('click', function (e) {
 
 if (e.target.classList.contains('addRow')) {
+    if (!document.getElementById('productRows')) return;
 
     let originalRow = document.querySelector('.productRow');
+    if (!originalRow) return;
 
     // Destroy select2 before cloning
     $(originalRow).find('.productSelect').select2('destroy');
@@ -1878,15 +2017,20 @@ if (e.target.classList.contains('addRow')) {
     } else {
         initProductSearch(newProductSelect);
     }
-    updateLeadTimeFromCategories();
+    if (typeof updateLeadTimeFromCategories === 'function') {
+        updateLeadTimeFromCategories();
+    }
 }
 
 
 
     // REMOVE ROW
     if (e.target.classList.contains('removeRow')) {
+        if (!document.getElementById('productRows')) return;
         e.target.closest('tr').remove();
-        updateLeadTimeFromCategories();
+        if (typeof updateLeadTimeFromCategories === 'function') {
+            updateLeadTimeFromCategories();
+        }
         calculateSubtotal();
     }
 });
@@ -1928,9 +2072,10 @@ if (e.target.classList.contains('addRow')) {
 // });
 
 document.addEventListener('input', function (e) {
+    if (!document.getElementById('productRows')) return;
 
     let row = e.target.closest('tr');
-    if (!row) return;
+    if (!row || !row.classList.contains('productRow')) return;
 
     let qty  = parseFloat(row.querySelector('.qty')?.value) || 0;
     let rate = parseFloat(row.querySelector('.rate')?.value) || 0;
@@ -1945,16 +2090,16 @@ document.addEventListener('input', function (e) {
 
     // % → Amount
     if (e.target.classList.contains('requestdis-percent')) {
-        let percent = parseFloat(percentInput.value) || 0;
+        let percent = parseFloat(percentInput?.value) || 0;
         discountAmount = (gross * percent) / 100;
-        amountInput.value = discountAmount.toFixed(2);
+        if (amountInput) amountInput.value = discountAmount.toFixed(2);
     }
 
     // Amount → %
     if (e.target.classList.contains('requestdis-amount')) {
-        discountAmount = parseFloat(amountInput.value) || 0;
+        discountAmount = parseFloat(amountInput?.value) || 0;
         let percent = gross > 0 ? (discountAmount / gross) * 100 : 0;
-        percentInput.value = percent.toFixed(2);
+        if (percentInput) percentInput.value = percent.toFixed(2);
     }
 
     // Qty / Rate changed → recompute using amount
@@ -1962,7 +2107,7 @@ document.addEventListener('input', function (e) {
         e.target.classList.contains('qty') ||
         e.target.classList.contains('rate')
     ) {
-        discountAmount = parseFloat(amountInput.value) || 0;
+        discountAmount = parseFloat(amountInput?.value) || 0;
     }
 
     // FINAL CALCULATION
@@ -1970,9 +2115,9 @@ document.addEventListener('input', function (e) {
     let taxamt = (lbt * tax) / 100;
     let total = lbt + taxamt;
 
-    row.querySelector('.lbt').value = lbt.toFixed(2);
-    row.querySelector('.taxamt').value = taxamt.toFixed(2);
-    row.querySelector('.total').value = total.toFixed(2);
+    if (row.querySelector('.lbt')) row.querySelector('.lbt').value = lbt.toFixed(2);
+    if (row.querySelector('.taxamt')) row.querySelector('.taxamt').value = taxamt.toFixed(2);
+    if (row.querySelector('.total')) row.querySelector('.total').value = total.toFixed(2);
 
     calculateSubtotal();
 });
@@ -1980,27 +2125,29 @@ document.addEventListener('input', function (e) {
 
 // TOTALS
 function calculateSubtotal() {
+    if (!document.getElementById('productRows') || !document.getElementById('subtotal')) return;
 
     let subtotal = 0;
     let taxTotal = 0;
     let grandTotal = 0;
 
     document.querySelectorAll('.productRow').forEach(row => {
-        subtotal += parseFloat(row.querySelector('.lbt').value) || 0;
-        taxTotal += parseFloat(row.querySelector('.taxamt').value) || 0;
-        grandTotal += parseFloat(row.querySelector('.total').value) || 0;
+        subtotal += parseFloat(row.querySelector('.lbt')?.value) || 0;
+        taxTotal += parseFloat(row.querySelector('.taxamt')?.value) || 0;
+        grandTotal += parseFloat(row.querySelector('.total')?.value) || 0;
     });
 
-    document.getElementById('subtotal').value = subtotal.toFixed(2);
-    document.getElementById('taxtotal').value = taxTotal.toFixed(2);
-    document.getElementById('grandtotal').value = grandTotal.toFixed(2);
+    if (document.getElementById('subtotal')) document.getElementById('subtotal').value = subtotal.toFixed(2);
+    if (document.getElementById('taxtotal')) document.getElementById('taxtotal').value = taxTotal.toFixed(2);
+    if (document.getElementById('grandtotal')) document.getElementById('grandtotal').value = grandTotal.toFixed(2);
 }
 </script>
 <script>
 document.addEventListener('input', function (e) {
+    if (!document.getElementById('productRows')) return;
 
     let row = e.target.closest('tr');
-    if (!row) return;
+    if (!row || !row.classList.contains('productRow')) return;
 
     let qty  = parseFloat(row.querySelector('.qty')?.value) || 0;
     let rate = parseFloat(row.querySelector('.rate')?.value) || 0;

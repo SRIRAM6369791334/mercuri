@@ -49,10 +49,85 @@ class PurchaseOrder extends Model
         'freight_charges',
         'unloading_charges',
         'installation_scope',
-        'hide_brand_name'
+        'hide_brand_name',
+        'mercuriis_branch',
+        'hsn_code',
+        'part_no',
+        'advance_percentage',
+        'advance_amount',
+        'advance_status',
+        'sir_approved_by',
+        'sir_approved_at',
+        'sir_remark',
+        'finance_released_by',
+        'finance_released_at',
+        'finance_utr_no',
+        'finance_payment_mode',
+        'finance_remark',
+        'calculated_due_date',
+        'supplier_work_order_no',
+        'supplier_dispatch_date',
+        'technical_specification',
+        'additional_file',
+        'production_milestone',
+        'supplier_address_id',
+        'customer_site_id',
+        'dispatch_reminder_sent_at',
+        'po_date',
+        'gst_percentage',
+        'overall_discount_percentage',
+        'overall_discount_amount',
+        'taxable_amount',
+        'committed_dispatch_date',
+        'actual_dispatch_date',
+        'lifecycle_status',
     ];
 
     protected $dates = ['deleted_at'];
+
+    public function supplierAddress(){
+        return $this->belongsTo(VendorAddress::class, 'supplier_address_id', 'id')->withTrashed();
+    }
+
+    public function customerSite(){
+        return $this->belongsTo(CustomerAddress::class, 'customer_site_id', 'id');
+    }
+
+    public function statusHistories(){
+        return $this->hasMany(PoStatusHistory::class, 'po_no', 'po_no')->orderBy('created_at', 'desc');
+    }
+
+    public function accessories()
+    {
+        return $this->hasMany(PurchaseOrderAccessory::class, 'purchase_order_line_id');
+    }
+
+    public function getGrandTotalAttribute()
+    {
+        if (!empty($this->po_no)) {
+            $lines = PurchaseOrder::where('po_no', $this->po_no)->get();
+            if ($lines->count() > 1) {
+                $sumLineTotal = $lines->sum('total_amount');
+                return round($sumLineTotal + (float)$this->freight_charges + (float)$this->unloading_charges + (float)$this->roundoff, 2);
+            }
+        }
+        return round((float)$this->total_amount + (float)$this->freight_charges + (float)$this->unloading_charges + (float)$this->roundoff, 2);
+    }
+
+    public function setGrandTotalAttribute($value)
+    {
+        $this->attributes['total_amount'] = $value;
+    }
+
+    public function getAdvanceUtrNumberAttribute()
+    {
+        return $this->finance_utr_no;
+    }
+
+    public function setAdvanceUtrNumberAttribute($value)
+    {
+        $this->attributes['finance_utr_no'] = $value;
+    }
 
     public function categoryDetails(){
         return $this->belongsTo(ProductCategory::class, 'cat_id', 'id');
@@ -84,5 +159,13 @@ class PurchaseOrder extends Model
 
     public function quotation(){
         return $this->belongsTo(Quotation::class, 'quotation_id', 'id');
+    }
+
+    public function sirApprover(){
+        return $this->belongsTo(User::class, 'sir_approved_by', 'id');
+    }
+
+    public function financeUser(){
+        return $this->belongsTo(User::class, 'finance_released_by', 'id');
     }
 }

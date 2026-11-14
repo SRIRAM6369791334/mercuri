@@ -1,7 +1,7 @@
 <div class="reference-page-frame" aria-hidden="true"></div>
 @if (!empty($isPreview))
     <div class="watermark-overlay" aria-hidden="true">
-        <div class="watermark-text">PREVIEW</div>
+        <div class="watermark-text">MERCURIIS</div>
     </div>
 @endif
 <img class="reference-page-logo" src="{{ $logoSrc }}" alt="Mercuriis">

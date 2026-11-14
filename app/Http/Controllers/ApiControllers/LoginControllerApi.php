@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use App\Models\User;
 
 
 class LoginControllerApi extends Controller
@@ -84,9 +85,13 @@ class LoginControllerApi extends Controller
 
         if ($role) {
             if ($role->userstatus == 'Active' && Hash::check($password, $role->password)) {
+                $userModel = User::find($role->id);
+                $token = $userModel ? $userModel->createToken('staff-api-token')->plainTextToken : null;
+
                 return response()->json([
                     'status' => '200',
                     'message' => 'Login Successfully',
+                    'token' => $token,
                     'id' => $role->id,
                     'phone' => $role->mobilenumber,
                     'name' => $role->name,

@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 
 class OrfController extends Controller
 {
@@ -97,6 +98,11 @@ if ($request->hasFile('sigdraw')) {
             'orfdate' => $orfdate,
             'cusporef' => $request->cusporef,
             'podate' => $podate,
+            'check_po' => $request->has('check_po') ? 1 : 0,
+            'check_drawing' => $request->has('check_drawing') ? 1 : 0,
+            'check_commercial' => $request->has('check_commercial') ? 1 : 0,
+            'check_quotation' => $request->has('check_quotation') ? 1 : 0,
+            'check_orf' => $request->has('check_orf') ? 1 : 0,
             // 'attcuspo' => $attcuspoPath,
             // 'sigdraw' => $sigdrawPath,
             'crddate' => $crddate,
@@ -220,9 +226,41 @@ $mailData = [
         $lead = orf::find($request->orfid);
 
         if ($lead) {
+            $hasDrawing = !empty($lead->sigdraw);
+            if (Schema::hasTable('orf_attachments')) {
+                $hasDrawing = $hasDrawing || $lead->attachments()->where('type', 'sigdraw')->exists();
+            }
+
+            if ((string) $request->approval_status === '1') {
+                $requiredChecks = [
+                    'check_po' => 'PO',
+                    'check_commercial' => 'Commercial details',
+                ];
+                if ($hasDrawing) {
+                    $requiredChecks['check_drawing'] = 'Drawing';
+                }
+
+                $missingChecks = [];
+                foreach ($requiredChecks as $field => $label) {
+                    if (!$request->boolean($field)) {
+                        $missingChecks[] = $label;
+                    }
+                }
+
+                if ($missingChecks) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Complete the verification checklist: ' . implode(', ', $missingChecks) . '.',
+                    ], 422);
+                }
+            }
+
             // Update lead details
             $lead->approval_status = $request->approval_status ?? $lead->approval_status;
             $lead->cs_status = $request->cssta ?? $lead->cs_status;
+            $lead->check_po = $request->boolean('check_po');
+            $lead->check_drawing = $hasDrawing ? $request->boolean('check_drawing') : 1;
+            $lead->check_commercial = $request->boolean('check_commercial');
 
             if ($request->approval_status == '2') {
                 $lead->reject_remark = $request->reject_remark;
@@ -272,6 +310,8 @@ $mailData = [
             $lead->cs_status = $request->cs_status ?? $lead->cs_status;
             $lead->dispatchdate = $request->dispatchdate;
             $lead->approval_status = $request->appsta ?? $lead->approval_status;
+            $lead->check_quotation = $request->has('check_quotation') ? 1 : 0;
+            $lead->check_orf = $request->has('check_orf') ? 1 : 0;
 
             if ($request->cs_status == '2') {
                 $lead->csreject_remark = $request->csreject_remark;
@@ -285,16 +325,18 @@ $mailData = [
 
             $authUsers = auth()->user();
             $leadRecords = Lead::where('id', $lead->leano)->first();
-            $assignedUsers = User::find($leadRecords->assigned_to);
+            $assignedUsers = ($leadRecords && $leadRecords->assigned_to) ? User::find($leadRecords->assigned_to) : null;
 
             $statusText = $lead->cs_status == '1' ? 'approved' : 'rejected';
+            $customerName = trim($leadRecords->LeadName ?? $lead->custo ?? '');
 
             $data = [
-                'orf_id' => $lead->orfref,
-                'status' => $statusText,
-                'dispatchdate' => $lead->dispatchdate,
+                'orf_id'          => $lead->orfref,
+                'status'          => $statusText,
+                'customer_name'   => $customerName,
+                'dispatchdate'    => $lead->dispatchdate,
                 'csreject_remark' => $lead->csreject_remark,
-                'auth_user' => $authUsers->name,
+                'auth_user'       => $authUsers ? $authUsers->name : 'System',
             ];
 
             try {
@@ -469,6 +511,11 @@ public function update(Request $request, $id)
         'orfdate'     => $orfdate,
         'cusporef'    => $request->cusporef,
         'podate'      => $podate,
+        'check_po'    => $request->has('check_po') ? 1 : 0,
+        'check_drawing' => $request->has('check_drawing') ? 1 : 0,
+        'check_commercial' => $request->has('check_commercial') ? 1 : ($orf->check_commercial ?? 0),
+        'check_quotation' => $request->has('check_quotation') ? 1 : ($orf->check_quotation ?? 0),
+        'check_orf'   => $request->has('check_orf') ? 1 : ($orf->check_orf ?? 0),
         'crddate'     => $crddate,
         'cs_status'   => 0,
         'approval_status' =>0,

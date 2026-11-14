@@ -446,11 +446,6 @@
                                                                     data-bs-original-title="Sent to Client"
                                                                     class="badge bg-info ms-1"><i class="fa fa-paper-plane"></i> Sent</span>
                                                             @endif
-                                                            @if ($e->revision_minor > 0 || preg_match('/\(R\d+-\d+\)$/', $e->quota_id))
-                                                                <span data-bs-toggle="tooltip" data-bs-placement="top"
-                                                                    data-bs-original-title="Internal Draft Revision"
-                                                                    class="badge bg-secondary ms-1">Draft</span>
-                                                            @endif
                                                             @if ($allApprovalsDone)
                                                                 <span data-bs-toggle="tooltip" data-bs-placement="top"
                                                                     data-bs-original-title="Quotation Approved"

@@ -44,7 +44,7 @@ class PurchaseEntryController extends Controller
             $gstAmt = ($sub_total / 100) * $product->gst;
             $totalAmt = $sub_total + $gstAmt;
             
-            PurchaseEntry::create([
+            $pe = PurchaseEntry::create([
                 "cat_id" => $value,
                 "po_no" => $poNumber[$key],
                 "po_id" => $poId[$key],
@@ -60,11 +60,9 @@ class PurchaseEntryController extends Controller
                 "total_amount" => $totalAmt,
             ]);
 
-            $lastPeId = PurchaseEntry::latest()->first();
-
             // to track stock movements
 
-            $product->addStock($proId[$key], $vendorId[$key], $pe_received_qty[$key], 'Stock purchased', $lastPeId->id);
+            $product->addStock($proId[$key], $vendorId[$key], $pe_received_qty[$key], 'Stock purchased', $pe->id);
         }
 
         return redirect()->route('purchase-entry-details')->with('success', 'Purchase entry created successfully');
@@ -123,8 +121,7 @@ class PurchaseEntryController extends Controller
             $peUpdate->total_amount = $totalAmt;
 
             // to track stock movements
-
-            if ($old_product_id[$key] != $proId[$key]) {
+            if ($old_product_id[$key] != $proId[$key] || $old_product_qty[$key] != $pe_received_qty[$key]) {
                 $product->updateStock($proId[$key], $vendorId[$key], $pe_received_qty[$key], 'Stock purchased', $peId[$key], $old_product_id[$key], $old_product_qty[$key]);
             }
 
@@ -137,12 +134,23 @@ class PurchaseEntryController extends Controller
     }
 
 
-    public function deletePE($peId, $oldQty, $proId)
+    public function deletePE($peId, $oldQty = null, $proId = null)
     {
-        $product = Product::findOrFail($proId);
-        $deletePe = PurchaseEntry::find($peId)->delete();
+        $pe = PurchaseEntry::find($peId);
+        if (!$pe) {
+            return back()->with('delete-error', 'Purchase entry not found');
+        }
+
+        // Always resolve product and quantity directly from the authentic database record
+        $actualProId = $pe->product_id;
+        $actualQty = $pe->received_qty;
+
+        $deletePe = $pe->delete();
         if ($deletePe) {
-            $product->deleteStock($proId, $oldQty);
+            $product = Product::find($actualProId);
+            if ($product) {
+                $product->deleteStock($actualProId, $actualQty);
+            }
             return back()->with('delete-success', 'Purchase entry deleted successfully');
         } else {
             return back()->with('delete-error', 'Something went wrong');

@@ -301,7 +301,7 @@ class Controller extends BaseController
     {
         $this->validateEnquiryDetail($request);
 
-        $data = $request->except('_token', 'newCustomerName', 'quantity', 'ga_number', 'assigndesign');
+        $data = $request->except('_token', 'newCustomerName', 'quantity', 'ga_number', 'pit_drawing', 'assigndesign');
 
         if ($request->LeadName === 'new' && $request->newCustomerName) {
             $data['LeadName'] = $request->newCustomerName;
@@ -377,6 +377,20 @@ class Controller extends BaseController
                 $gaFilePath = 'assets/images/' . $filename;
             }
 
+            $pitFilePath = null;
+            if ($request->hasFile('pit_drawing')) {
+                $file = $request->file('pit_drawing');
+                $filename = time() . '_pit_' . $file->getClientOriginalName();
+                $file->move(public_path('assets/images/'), $filename);
+                $pitFilePath = 'assets/images/' . $filename;
+            }
+
+            if ($gaFilePath || $pitFilePath) {
+                if ($gaFilePath) $lead->ganumber = $gaFilePath;
+                if ($pitFilePath) $lead->pit_drawing = $pitFilePath;
+                $lead->save();
+            }
+
             $selectedCategory = ProductCategory::find($request->category);
             $isSpecialCategory = $this->categoryRequiresDesign($selectedCategory);
             $designAssignee = $this->resolveCategoryDesignAssignee($selectedCategory, $request->assigndesign);
@@ -388,6 +402,7 @@ class Controller extends BaseController
                     'product' => $request->products,
                     'category' => $request->category,
                     'ganumber' => $gaFilePath ?? null,
+                    'pit_drawing' => $pitFilePath ?? null,
                     'quantity' => $request->quantity,
                     'assigndesign' => $designAssignee,
                 ]);
@@ -399,6 +414,7 @@ class Controller extends BaseController
                     'products' => $request->products,
                     'categorys' => $request->category,
                     'ga_number' => $gaFilePath ?? null,
+                    'pit_drawing' => $pitFilePath ?? null,
                     'quantitys' => $request->quantity,
                     'quota_id' => 'MSE/' . date('Y') . '/' . str_pad(Quotation::max('id') + 1, 4, '0', STR_PAD_LEFT),
                 ]);
@@ -437,6 +453,27 @@ class Controller extends BaseController
         // Check if lead exists
         if (!$lead) {
             return redirect()->back()->with('error', 'Lead not found');
+        }
+
+        $design = Design::where('idlead', $leadid)->latest()->first();
+        if ($design) {
+            if (empty($lead->ganumber) && !empty($design->ganumber)) {
+                $lead->ganumber = $design->ganumber;
+            }
+            if (empty($lead->pit_drawing) && !empty($design->pit_drawing)) {
+                $lead->pit_drawing = $design->pit_drawing;
+            }
+            if (empty($lead->ganumber)) {
+                $approvedDwg = DB::table('design_drawings')
+                    ->where('design_id', $design->id)
+                    ->where(function ($q) {
+                        $q->where('drawing_app', 1)->orWhereNotNull('sales_attach');
+                    })
+                    ->first();
+                if ($approvedDwg) {
+                    $lead->ganumber = 'storage/' . ($approvedDwg->sales_attach ?: $approvedDwg->file_path);
+                }
+            }
         }
 
         $leadProducts = DB::table('leadproducts')
@@ -480,6 +517,27 @@ class Controller extends BaseController
             return redirect()->back()->with('error', 'Lead not found');
         }
 
+        $design = Design::where('idlead', $leadid)->latest()->first();
+        if ($design) {
+            if (empty($lead->ganumber) && !empty($design->ganumber)) {
+                $lead->ganumber = $design->ganumber;
+            }
+            if (empty($lead->pit_drawing) && !empty($design->pit_drawing)) {
+                $lead->pit_drawing = $design->pit_drawing;
+            }
+            if (empty($lead->ganumber)) {
+                $approvedDwg = DB::table('design_drawings')
+                    ->where('design_id', $design->id)
+                    ->where(function ($q) {
+                        $q->where('drawing_app', 1)->orWhereNotNull('sales_attach');
+                    })
+                    ->first();
+                if ($approvedDwg) {
+                    $lead->ganumber = 'storage/' . ($approvedDwg->sales_attach ?: $approvedDwg->file_path);
+                }
+            }
+        }
+
         $leadProducts = DB::table('leadproducts')
             ->where('leadid', $leadid)
             ->get();
@@ -510,6 +568,27 @@ class Controller extends BaseController
         // Check if lead exists
         if (!$lead) {
             return redirect()->back()->with('error', 'Lead not found');
+        }
+
+        $design = Design::where('idlead', $leadid)->latest()->first();
+        if ($design) {
+            if (empty($lead->ganumber) && !empty($design->ganumber)) {
+                $lead->ganumber = $design->ganumber;
+            }
+            if (empty($lead->pit_drawing) && !empty($design->pit_drawing)) {
+                $lead->pit_drawing = $design->pit_drawing;
+            }
+            if (empty($lead->ganumber)) {
+                $approvedDwg = DB::table('design_drawings')
+                    ->where('design_id', $design->id)
+                    ->where(function ($q) {
+                        $q->where('drawing_app', 1)->orWhereNotNull('sales_attach');
+                    })
+                    ->first();
+                if ($approvedDwg) {
+                    $lead->ganumber = 'storage/' . ($approvedDwg->sales_attach ?: $approvedDwg->file_path);
+                }
+            }
         }
 
         $leadProducts = DB::table('leadproducts')
@@ -797,8 +876,53 @@ class Controller extends BaseController
         $category = $request->input('category');
         $subCategory = $request->input('subCategory');
 
+        $query = DB::table('products');
+
+        if (!empty($subCategory)) {
+            $subCat = DB::table('product_sub_categories')->where('id', $subCategory)->first();
+            $matchingSubIds = [(int)$subCategory];
+
+            if ($subCat) {
+                $sameNameIds = DB::table('product_sub_categories')
+                    ->whereRaw('LOWER(TRIM(subcategory_name)) = ?', [strtolower(trim($subCat->subcategory_name))])
+                    ->pluck('id')
+                    ->map(fn($id) => (int)$id)
+                    ->toArray();
+                $matchingSubIds = array_values(array_unique(array_merge($matchingSubIds, $sameNameIds)));
+            }
+
+            $query->where(function ($q) use ($matchingSubIds, $category, $subCat) {
+                $q->whereIn('sub_cat_id', $matchingSubIds);
+
+                // Fallback for MHE Special products matching by group name
+                if ($category == 2 && $subCat) {
+                    $subName = strtolower(trim($subCat->subcategory_name));
+                    if (str_contains($subName, 'dock leveler')) {
+                        $q->orWhere(function ($sq) {
+                            $sq->where('Productcategory', 2)
+                               ->where(function ($nq) {
+                                   $nq->where('productname', 'like', '%Dock Leveler%')
+                                      ->orWhere('productname', 'like', '%DL%');
+                               });
+                        });
+                    } elseif (str_contains($subName, 'goods lift')) {
+                        $q->orWhere('productname', 'like', '%Goods Lift%');
+                    } elseif (str_contains($subName, 'scissor lift')) {
+                        $q->orWhere('productname', 'like', '%Scissor Lift%');
+                    }
+                }
+            });
+
+            // If not MHE Special and category is provided, scope strictly by category
+            if ($category && $category != 2) {
+                $query->where('Productcategory', $category);
+            }
+        } elseif (!empty($category)) {
+            $query->where('Productcategory', $category);
+        }
+
         // Fetch products based on category and subCategory
-        $products = DB::table('products')->where('Productcategory', $category)->where('sub_cat_id', $subCategory)->select('id', 'productname')->get();
+        $products = $query->select('id', 'productname')->get();
 
         // Build the HTML for the product options
         $productOptions = '';
@@ -1127,6 +1251,15 @@ class Controller extends BaseController
                 $file->move($destinationPath, $filename);
                 $gaFilePath = 'assets/images/' . $filename;
             }
+
+            $pitFilePath = null;
+            if ($request->hasFile('pit_drawing')) {
+                $file = $request->file('pit_drawing');
+                $filename = time() . '_pit_' . $file->getClientOriginalName();
+                $destinationPath = public_path('assets/images/');
+                $file->move($destinationPath, $filename);
+                $pitFilePath = 'assets/images/' . $filename;
+            }
             $productInput = $request->products;
             if (is_array($productInput)) {
                 $productIds = array_values(array_filter($productInput));
@@ -1143,6 +1276,7 @@ class Controller extends BaseController
             $lead->subcategory_id = $request->sub_category_id;
             $lead->remarks = $request->remarks;
             $lead->ganumber = $gaFilePath ?? $lead->ganumber;
+            $lead->pit_drawing = $pitFilePath ?? $lead->pit_drawing;
             $lead->converteddate = $request->converteddate;
 
             if ($request->status != '343') {
@@ -1245,6 +1379,7 @@ class Controller extends BaseController
                     'product' => $productString,
                     'category' => $request->category,
                     'ganumber' => $gaFilePath ?? null,
+                    'pit_drawing' => $pitFilePath ?? null,
                     'quantity' => $request->quantity,
                     'assigndesign' => $designAssignee,
                     // 'design_input'  => $designInputPath,
@@ -1253,19 +1388,26 @@ class Controller extends BaseController
                 $lead->quota_proceed = null;
                 $lead->save();
 
-                if ($request->has('spec_ids') && $request->has('spec_values')) {
+                if ($request->has('spec_values') || $request->has('spec_ids')) {
+                    $specValues = $request->input('spec_values', []);
+                    $specIds = $request->input('spec_ids', []);
+                    $specNames = $request->input('spec_names', []);
 
-                    foreach ($request->spec_ids as $i => $specId) {
+                    foreach ($specValues as $i => $value) {
+                        if ($value !== null && trim((string)$value) !== '') {
+                            $specId = $specIds[$i] ?? null;
+                            $specName = $specNames[$i] ?? null;
 
-                        $value = $request->spec_values[$i] ?? null;
-
-                        if (!empty($value)) {
+                            if (!$specName && !empty($specId) && is_numeric($specId)) {
+                                $specName = optional(DesignSpecificationMaster::find($specId))->spec_name;
+                            }
 
                             DesignSpecification::create([
-                                'lead_id' => $lead->id,
-                                'design_id' => $design->id,
-                                'specification' => $specId,      // FK to design_specification_masters (optional but recommended)
-                                'spec_value' => $value,
+                                'lead_id'       => $lead->id,
+                                'design_id'     => $design->id,
+                                'specification' => (is_numeric($specId) ? $specId : null),
+                                'spec_name'     => $specName ?: 'Specification',
+                                'spec_value'    => trim((string)$value),
                             ]);
                         }
                     }
@@ -1637,20 +1779,22 @@ class Controller extends BaseController
     {
         $year = date('Y');
 
-        $lastBaseQuotation = Quotation::where('quota_id', 'like', "MSE/{$year}/%")
-            ->where('quota_id', 'not like', '%(%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(quota_id, '/', -1) AS UNSIGNED) DESC")
+        $allQuotaIds = Quotation::where('quota_id', 'like', "MSE/{$year}/%")
             ->lockForUpdate()
-            ->first();
+            ->pluck('quota_id');
 
-        if ($lastBaseQuotation) {
-            preg_match('/MSE\/\d{4}\/(\d+)/', $lastBaseQuotation->quota_id, $matches);
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
+        $max = 0;
+        foreach ($allQuotaIds as $qid) {
+            if (preg_match('/MSE\/\d{4}\/(\d+)/i', $qid, $matches)) {
+                $num = (int) $matches[1];
+                if ($num > $max) {
+                    $max = $num;
+                }
+            }
         }
+        $next = $max + 1;
 
-        return 'MSE/' . $year . '/' . str_pad($next, 4, '0', STR_PAD_LEFT);
+        return 'MSE/' . $year . '/' . str_pad($next, 4, '0', STR_PAD_LEFT) . '(R0)';
     }
 
 
@@ -2114,13 +2258,27 @@ class Controller extends BaseController
             'freight_sub_category' => 'required_if:freight_sub_category_id,new',
             'warranty' => 'required',
             'newwarcondition' => 'required_if:warranty,new',
+            'dov' => 'required',
             'dov_new' => 'required_if:dov,new',
+            'unloading' => 'required',
             'new_unloading' => 'required_if:unloading,new',
+            'installation' => 'required',
             'new_installation' => 'required_if:installation,new',
             'new_agent' => 'required_if:agent,new',
+            'quto_status' => 'required',
             'new_quto_status' => 'required_if:quto_status,new',
             'remarks' => 'nullable|string',
             'currency' => 'required|string',
+        ], [
+            'quto_status.required' => 'The Quotation Status field is required.',
+            'new_quto_status.required_if' => 'The Custom Quotation Status field is required.',
+            'installation.required' => 'The Installation Scope field is required.',
+            'new_installation.required_if' => 'The Custom Installation Scope field is required.',
+            'currency.required' => 'The Currency field is required.',
+            'dov.required' => 'The Date of Validity field is required.',
+            'dov_new.required_if' => 'The Custom Date of Validity field is required.',
+            'unloading.required' => 'The Unloading at site field is required.',
+            'new_unloading.required_if' => 'The Custom Unloading at site field is required.',
         ]);
 
         if ($request->freight_category_id !== 'new' && $request->filled('freight_category_id')) {
@@ -2264,55 +2422,148 @@ class Controller extends BaseController
             $editMode = $request->filled('quotation_id');
             $revisionMajor = 0;
             $revisionMinor = 0;
+            $isNewRevision = false;
 
             if (!$editMode) {
-
-                // 🟢 NEW BASE QUOTATION
+                // 🟢 NEW BASE QUOTATION: MSE/YYYY/XXXX(R0)
                 $quotationNo = $this->generateBaseQuotationNo();
-
+                $isNewRevision = true;
             } else {
-
-                // 🔁 CREATE REVISION
                 $currentQuotation = Quotation::findOrFail($request->quotation_id);
 
                 $approvalStatus = $this->getQuotationApprovalStatus($currentQuotation->id);
                 $qualifiesForExternal = \App\Helpers\QuotationRevisionHelper::qualifiesForExternalRevision($currentQuotation, $approvalStatus);
 
-                $revData = \App\Helpers\QuotationRevisionHelper::generateNextRevision($currentQuotation, $qualifiesForExternal);
-                $quotationNo = $revData['quota_id'];
-                $revisionMajor = $revData['revision_major'];
-                $revisionMinor = $revData['revision_minor'];
+                if ($qualifiesForExternal) {
+                    // 🔁 APPROVED OR SENT TO CLIENT → CREATE NEW REVISION (R1, R2, ...)
+                    $baseNo = \App\Helpers\QuotationRevisionHelper::getBaseQuotationNo($currentQuotation->quota_id);
+                    $nextMajor = \App\Helpers\QuotationRevisionHelper::getNextRevisionNumber($currentQuotation);
+
+                    $quotationNo = \App\Helpers\QuotationRevisionHelper::formatQuotaId($baseNo, $nextMajor);
+                    $revisionMajor = $nextMajor;
+                    $revisionMinor = 0;
+                    $isNewRevision = true;
+                } else {
+                    // ✏️ INTERNAL EDIT (NOT APPROVED & NOT SENT) → UPDATE EXISTING IN-PLACE (STAY R0 / SAME REVISION)
+                    $baseNo = \App\Helpers\QuotationRevisionHelper::getBaseQuotationNo($currentQuotation->quota_id);
+                    $parsed = \App\Helpers\QuotationRevisionHelper::parseRevision($currentQuotation->quota_id);
+
+                    $quotationNo = \App\Helpers\QuotationRevisionHelper::formatQuotaId($baseNo, $parsed['major']);
+                    $revisionMajor = $parsed['major'];
+                    $revisionMinor = 0;
+                    $isNewRevision = false;
+                }
             }
 
+            $lead = Lead::find($request->leadno);
 
-            // FINAL quotation number — DO NOT CHANGE BELOW THIS
-// $finalQuotationNo = $quotationNo;
+            // Handle GA drawing upload or inheritance
+            $gaFilePath = null;
+            if ($request->hasFile('ga_number')) {
+                $file = $request->file('ga_number');
+                $filename = time() . '_ga_' . $file->getClientOriginalName();
+                $file->move(public_path('assets/images/'), $filename);
+                $gaFilePath = 'assets/images/' . $filename;
+            } elseif ($request->filled('existing_ga_number')) {
+                $gaFilePath = $request->existing_ga_number;
+            } elseif ($editMode && !empty($currentQuotation->ga_number)) {
+                $gaFilePath = $currentQuotation->ga_number;
+            } elseif ($lead && !empty($lead->ganumber)) {
+                $gaFilePath = $lead->ganumber;
+            }
 
+            // Handle Pit drawing upload or inheritance
+            $pitFilePath = null;
+            if ($request->hasFile('pit_drawing')) {
+                $file = $request->file('pit_drawing');
+                $filename = time() . '_pit_' . $file->getClientOriginalName();
+                $file->move(public_path('assets/images/'), $filename);
+                $pitFilePath = 'assets/images/' . $filename;
+            } elseif ($request->filled('existing_pit_drawing')) {
+                $pitFilePath = $request->existing_pit_drawing;
+            } elseif ($editMode && !empty($currentQuotation->pit_drawing)) {
+                $pitFilePath = $currentQuotation->pit_drawing;
+            } elseif ($lead && !empty($lead->pit_drawing)) {
+                $pitFilePath = $lead->pit_drawing;
+            }
 
+            if ($lead) {
+                if ($gaFilePath && empty($lead->ganumber)) {
+                    $lead->ganumber = $gaFilePath;
+                }
+                if ($pitFilePath && empty($lead->pit_drawing)) {
+                    $lead->pit_drawing = $pitFilePath;
+                }
+                $lead->save();
+            }
 
-            $quotation = Quotation::create([
-                'id_lead' => $request->leadno,
-                'quota_id' => $quotationNo,
-                'revision_major' => $revisionMajor,
-                'revision_minor' => $revisionMinor,
-                'parent_quotation_id' => $editMode ? $currentQuotation->id : null,
+            if ($isNewRevision) {
+                $quotation = Quotation::create([
+                    'id_lead' => $request->leadno,
+                    'quota_id' => $quotationNo,
+                    'revision_major' => $revisionMajor,
+                    'revision_minor' => $revisionMinor,
+                    'parent_quotation_id' => $editMode ? $currentQuotation->id : null,
+                    'ga_number' => $gaFilePath,
+                    'pit_drawing' => $pitFilePath,
 
-                'subtotal' => 0,
-                'tax_total' => 0,
-                'grand_total' => 0,
+                    'subtotal' => 0,
+                    'tax_total' => 0,
+                    'grand_total' => 0,
 
-                'dis_app' => 2,
-                'quto_app' => 2,
-                'freight_approval' => $freightApproval,
-                'same_as_billing_address' => $same_as_billing,
+                    'dis_app' => 2,
+                    'quto_app' => 2,
+                    'freight_approval' => $freightApproval,
+                    'same_as_billing_address' => $same_as_billing,
 
-                'shipping_address' => $request->placeofsupply,
-                'shipping_country' => $request->shippingcountry,
-                'shipping_state' => $request->shistate_id,
-                'shipping_city' => $request->shcitylist,
-                'shipping_pincode' => $request->shippostalcode,
-                'shipping_gst' => $request->gstnum,
-            ]);
+                    'shipping_address' => $request->placeofsupply,
+                    'shipping_country' => $request->shippingcountry,
+                    'shipping_state' => $request->shistate_id,
+                    'shipping_city' => $request->shcitylist,
+                    'shipping_pincode' => $request->shippostalcode,
+                    'shipping_gst' => $request->gstnum,
+                    'sent_to_customer' => 0,
+                    'sent_to_customer_at' => null,
+                    'sent_to_customer_by' => null,
+                ]);
+            } else {
+                $quotation = $currentQuotation;
+                $quotation->update([
+                    'quota_id' => $quotationNo,
+                    'revision_major' => $revisionMajor,
+                    'revision_minor' => $revisionMinor,
+                    'ga_number' => $gaFilePath,
+                    'pit_drawing' => $pitFilePath,
+                    'freight_approval' => $freightApproval,
+                    'same_as_billing_address' => $same_as_billing,
+                    'shipping_address' => $request->placeofsupply,
+                    'shipping_country' => $request->shippingcountry,
+                    'shipping_state' => $request->shistate_id,
+                    'shipping_city' => $request->shcitylist,
+                    'shipping_pincode' => $request->shippostalcode,
+                    'shipping_gst' => $request->gstnum,
+                ]);
+
+                // Clean up previous related items for in-place update
+                QuotationProduct::where('quotationno', $quotationNo)
+                    ->orWhere('quotationno', $currentQuotation->quota_id)
+                    ->delete();
+
+                \App\Models\QuotationAccessory::where('quotation_id', $quotation->id)
+                    ->orWhere('quotationno', $quotationNo)
+                    ->orWhere('quotationno', $currentQuotation->quota_id)
+                    ->delete();
+
+                Freight::where('quotationno', $quotation->id)->delete();
+
+                \App\Models\QuotationTermChangeRequest::where('quotation_id', $quotation->id)
+                    ->where('status', 'Pending Approval')
+                    ->delete();
+
+                \App\Models\QuotationChargeApprovalHistory::where('quotation_id', $quotation->id)
+                    ->where('status', 'Pending Approval')
+                    ->delete();
+            }
 
             /* -------------------------------------------------
      | ⭐ SPECIAL PRODUCT TOTALS
@@ -2425,17 +2676,31 @@ class Controller extends BaseController
                 // Determine default installation charge based on product keywords
                 // (goods lift = 30000, scissor lift / dock leveler = 15000)
                 $defaultInstallCharge = 0.00;
+                $needsMercuriisScope = false;
                 if ($request->has('product_id') && is_array($request->product_id)) {
                     $productModels = \App\Models\Product::whereIn('id', array_filter($request->product_id))->pluck('productname');
                     foreach ($productModels as $pname) {
                         $pNameLower = strtolower($pname);
-                        if (str_contains($pNameLower, 'goods lift')) {
+                        if (str_contains($pNameLower, 'goods lift') || str_contains($pNameLower, 'goodslift')) {
                             $defaultInstallCharge = 30000.00;
+                            $needsMercuriisScope = true;
                             break;
                         } elseif (str_contains($pNameLower, 'dock leveler') ||
-                            str_contains($pNameLower, 'scissor lift')) {
+                            str_contains($pNameLower, 'docl leveler') ||
+                            str_contains($pNameLower, 'dock') ||
+                            str_contains($pNameLower, 'scissor lift') ||
+                            str_contains($pNameLower, 'scissorlift')) {
                             $defaultInstallCharge = 15000.00;
+                            $needsMercuriisScope = true;
                         }
+                    }
+                }
+
+                if (!$installationId) {
+                    if ($needsMercuriisScope) {
+                        $installationId = optional(QuotationInstallationScope::where('name', 'like', '%Mercuriis%')->first())->id;
+                    } else {
+                        $installationId = optional(QuotationInstallationScope::where('name', 'None')->first())->id;
                     }
                 }
 
@@ -2467,10 +2732,18 @@ class Controller extends BaseController
                 $defaultFreightCharge = 10000.00;
                 $userFreightCharge = (float) ($request->freight_charge ?? $defaultFreightCharge);
 
-                $additionalWarrantyMonths = (int) ($request->additional_warranty_months ?? 0);
-                $additionalWarrantyPct = (float) ($request->additional_warranty_percentage ?? 0.00);
-                $additionalWarrantyCharge = (float) ($request->additional_warranty_charge ?? 0.00);
-                $includeWarrantyInBasic = $request->has('include_warranty_in_basic') ? 1 : 0;
+                $hasAdditionalWarranty = $request->input('has_additional_warranty') === 'yes';
+                if ($request->has('has_additional_warranty') && !$hasAdditionalWarranty) {
+                    $additionalWarrantyMonths = 0;
+                    $additionalWarrantyPct = 0.00;
+                    $additionalWarrantyCharge = 0.00;
+                    $includeWarrantyInBasic = 0;
+                } else {
+                    $additionalWarrantyMonths = (int) ($request->additional_warranty_months ?? 0);
+                    $additionalWarrantyPct = (float) ($request->additional_warranty_percentage ?? 0.00);
+                    $additionalWarrantyCharge = (float) ($request->additional_warranty_charge ?? 0.00);
+                    $includeWarrantyInBasic = ($hasAdditionalWarranty && $additionalWarrantyMonths > 0) ? 1 : ((string)$request->input('include_warranty_in_basic') === '1' ? 1 : 0);
+                }
 
                 $instTax = $userInstallCharge * 0.18;
                 $freightTax = $userFreightCharge * 0.18;
@@ -2653,9 +2926,13 @@ class Controller extends BaseController
 
             DB::commit();
 
+            $successMsg = (!$editMode)
+                ? "Quotation created as {$quotationNo}"
+                : ($isNewRevision ? "New revision created as {$quotationNo}" : "Quotation {$quotationNo} updated successfully");
+
             return redirect()
                 ->route('single.quota', ['leadid' => $request->leadno])
-                ->with('success', "Quotation saved as {$quotationNo}");
+                ->with('success', $successMsg);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -3847,20 +4124,29 @@ class Controller extends BaseController
         }
 
         // 5️⃣ Send mail
-        Mail::to($toEmail)
-            ->cc($ccMail ? array_filter(explode(',', $ccMail)) : [])
-            ->send(new QuotationMail($quotation, $pdf, $fromMail, $drawingPaths));
+        try {
+            Mail::to($toEmail)
+                ->cc($ccMail ? array_filter(explode(',', $ccMail)) : [])
+                ->send(new QuotationMail($quotation, $pdf, $fromMail, $drawingPaths));
 
-        // Mark quotation as sent to customer
-        $quotation->update([
-            'sent_to_customer' => 1,
-            'sent_to_customer_at' => now(),
-            'sent_to_customer_by' => auth()->id(),
-        ]);
+            // Mark quotation as sent to customer
+            $quotation->update([
+                'sent_to_customer' => 1,
+                'sent_to_customer_at' => now(),
+                'sent_to_customer_by' => auth()->id(),
+            ]);
 
-        return response()->json([
-            'message' => 'Quotation sent successfully to client.'
-        ]);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Quotation sent successfully to client.'
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Quotation Mail failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to send email: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function markQuotationSent($id)
@@ -3962,10 +4248,72 @@ class Controller extends BaseController
 
     public function getSpecs($categoryId, $type)
     {
-        return DesignSpecificationMaster::where('category_id', $categoryId)
-            ->where('type', $type)
-            ->orderBy('spec_name')
-            ->get(['id', 'spec_name']);
+        $subCategoryId = request('sub_category_id') ?: request('subCategory');
+        $groupName = '';
+
+        if ($subCategoryId) {
+            $subCat = \App\Models\ProductSubCategory::find($subCategoryId);
+            if ($subCat) {
+                $groupName = strtolower(trim($subCat->subcategory_name));
+            }
+        }
+
+        $specs = [];
+
+        // 1. SCISSORLIFT (5 fields as per client screenshot)
+        if (str_contains($groupName, 'scissor')) {
+            $specs = [
+                ['id' => 'sl_1', 'spec_name' => 'Capacity', 'type' => 'text', 'placeholder' => 'e.g. 1000 kg'],
+                ['id' => 'sl_2', 'spec_name' => 'Platform sizes', 'type' => 'text', 'placeholder' => 'e.g. 1000 x 1000 mm'],
+                ['id' => 'sl_3', 'spec_name' => 'Lift Height', 'type' => 'text', 'placeholder' => 'e.g. 1500 mm'],
+                ['id' => 'sl_4', 'spec_name' => 'Type', 'type' => 'select', 'options' => ['Floor Mounted', 'Pit Mounted']],
+                ['id' => 'sl_5', 'spec_name' => 'Lip', 'type' => 'text', 'placeholder' => 'e.g. Manual Lip / Fixed Lip / Yes / No'],
+            ];
+        }
+        // 2. GOODSLIFT (9 fields as per client screenshot)
+        elseif (str_contains($groupName, 'goods')) {
+            $specs = [
+                ['id' => 'gl_1', 'spec_name' => 'Capacity', 'type' => 'text', 'placeholder' => 'e.g. 1000 kg'],
+                ['id' => 'gl_2', 'spec_name' => 'Platform sizes', 'type' => 'text', 'placeholder' => 'e.g. 1500 x 1500 mm'],
+                ['id' => 'gl_3', 'spec_name' => 'Lift Height', 'type' => 'text', 'placeholder' => 'e.g. 3000 mm / 6000 mm'],
+                ['id' => 'gl_4', 'spec_name' => 'Entry&Exit', 'type' => 'text', 'placeholder' => 'e.g. Same side / Opposite sides / Adjacent'],
+                ['id' => 'gl_5', 'spec_name' => 'Mast', 'type' => 'text', 'placeholder' => 'e.g. Single Mast / Double Mast / 4 Mast'],
+                ['id' => 'gl_6', 'spec_name' => 'Level', 'type' => 'text', 'placeholder' => 'e.g. G+1 / G+2 / Ground to 1st Floor'],
+                ['id' => 'gl_7', 'spec_name' => 'Type', 'type' => 'select', 'options' => ['Floor Mounted', 'Pit Mounted']],
+                ['id' => 'gl_8', 'spec_name' => 'Interlocking system', 'type' => 'text', 'placeholder' => 'e.g. Electro-mechanical Interlock / Required'],
+                ['id' => 'gl_9', 'spec_name' => 'Mesh enclosue', 'type' => 'text', 'placeholder' => 'e.g. All 4 sides wire mesh / Perforated sheet'],
+            ];
+        }
+        // 3. DOCK LEVELER (2 fields as per client screenshot)
+        elseif (str_contains($groupName, 'dock')) {
+            $specs = [
+                ['id' => 'dl_1', 'spec_name' => 'Capacity', 'type' => 'text', 'placeholder' => 'e.g. 9000 kg Dynamic Load'],
+                ['id' => 'dl_2', 'spec_name' => 'Deck sizes(LXWXH)', 'type' => 'text', 'placeholder' => 'e.g. 2500L x 2000W x 550H mm'],
+            ];
+        }
+        // Default: If no specific group selected yet, fallback to master records
+        else {
+            $masters = DesignSpecificationMaster::where('category_id', $categoryId)
+                ->where('type', $type)
+                ->orderBy('id')
+                ->get(['id', 'spec_name']);
+
+            foreach ($masters as $m) {
+                $lower = strtolower(trim($m->spec_name));
+                $field = [
+                    'id'          => $m->id,
+                    'spec_name'   => $m->spec_name,
+                    'type'        => ($lower === 'type' ? 'select' : 'text'),
+                    'placeholder' => "Enter {$m->spec_name}"
+                ];
+                if ($lower === 'type') {
+                    $field['options'] = ['Floor Mounted', 'Pit Mounted'];
+                }
+                $specs[] = $field;
+            }
+        }
+
+        return response()->json($specs);
     }
 
     public function assignDesigner(Request $request)
@@ -4070,13 +4418,13 @@ class Controller extends BaseController
             ->get();
 
         $specs = DB::table('design_specifications as ds')
-            ->join('design_specification_masters as dsm', 'dsm.id', '=', 'ds.specification')
+            ->leftJoin('design_specification_masters as dsm', 'dsm.id', '=', 'ds.specification')
             ->where('ds.design_id', $designId)
             ->select([
-                'dsm.spec_name',
+                DB::raw('COALESCE(ds.spec_name, dsm.spec_name, "Specification") as spec_name'),
                 'ds.spec_value'
             ])
-            ->orderBy('dsm.spec_name')
+            ->orderBy('ds.id')
             ->get();
 
         $leadRemark = DB::table('designs')
@@ -4773,30 +5121,6 @@ class Controller extends BaseController
             'drawings' => DesignDrawing::where('design_id', $designId)->get()
         ]);
     }
-    // public function saveDrawingApproval(Request $request)
-// {
-//     $design = Design::findOrFail($request->design_id);
-
-    //     $hasReject = false;
-
-    //     foreach ($request->drawings as $id => $data) {
-
-    //         DesignDrawing::where('id', $id)->update([
-//             'drawing_app' => $data['status'],
-//             'drawing_remarks' => $data['remarks'] ?? null
-//         ]);
-
-    //         if ($data['status'] == 2) {
-//             $hasReject = true;
-//         }
-//     }
-
-    //     $design->update([
-//         'drawing_approved' => $hasReject ? 'rejected' : 'approved'
-//     ]);
-
-    //     return response()->json(['success' => true]);
-// }
     public function saveDrawingApproval(Request $request)
     {
         $design = Design::findOrFail($request->design_id);
@@ -4833,34 +5157,6 @@ class Controller extends BaseController
 
         return response()->json(['success' => true]);
     }
-
-    // public function saveDrawingApproval(Request $request)
-// {
-//     $design = Design::findOrFail($request->design_id);
-
-    //     $hasReject = false;
-
-    //     foreach ($request->drawings as $id => $data) {
-
-    //         DesignDrawing::where('id', $id)->update([
-//             'drawing_app'     => $data['status'],
-//             'drawing_remarks' => $data['remarks'] ?? null
-//         ]);
-
-    //         if ($data['status'] == 2) {
-//             $hasReject = true;
-//         }
-//     }
-
-    //     $design->update([
-//         'drawing_approved' => $hasReject ? 'rejected' : 'approved'
-//     ]);
-
-    //     // ✅ SEND MAIL
-//     $this->sendDrawingapproMail($design);
-
-    //     return response()->json(['success' => true]);
-// }
     private function sendDrawingapproMail($design)
     {
         $lead = Lead::find($design->idlead);
@@ -4904,17 +5200,21 @@ class Controller extends BaseController
             return;
         }
 
-        Mail::send('emails.drawing_approval', [
-            'lead_id' => $lead->lead_id ?? $lead->id,
-            'status' => $design->drawing_approved // approved / rejected
-        ], function ($message) use ($emails, $design) {
+        try {
+            Mail::send('emails.drawing_approval', [
+                'lead_id' => $lead->lead_id ?? $lead->id,
+                'status' => $design->drawing_approved // approved / rejected
+            ], function ($message) use ($emails, $design) {
 
-            $subject = $design->drawing_approved === 'approved'
-                ? 'Design Drawings Approved'
-                : 'Design Drawings Rejected';
+                $subject = $design->drawing_approved === 'approved'
+                    ? 'Design Drawings Approved'
+                    : 'Design Drawings Rejected';
 
-            $message->to($emails)->subject($subject);
-        });
+                $message->to($emails)->subject($subject);
+            });
+        } catch (\Throwable $e) {
+            Log::error('Drawing approval mail failed: ' . $e->getMessage());
+        }
     }
 
     public function getRejectedDrawings($designId)

@@ -12,6 +12,8 @@ class Vendor extends Model
 
     protected $table = 'vendor_details_tb';
 
+    protected $guarded = [];
+
     protected $dates = ['deleted_at'];
 
     public function stateData(){
@@ -20,5 +22,10 @@ class Vendor extends Model
 
     public function cityData(){
         return $this->belongsTo(Citylist::class, 'city_id', 'id');
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(VendorAddress::class, 'vendor_id', 'id');
     }
 }

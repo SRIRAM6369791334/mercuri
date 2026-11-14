@@ -250,70 +250,83 @@ $countries = DB::table('countries')->where('id',76)->get(); // Fetching all coun
                     <input type="date" name="podate" style="text-transform:uppercase;" value="{{ $orf->podate }}"  class="form-control " >
                 </div>
             </div>
-            {{-- Attach Customer PO --}}
-        {{-- <div class="col-lg-6 mt-4">
-            <div class="form-group">
-                <label>Attach Customer PO</label>
-                <input type="file" name="attcuspo" class="form-control">
-                @if($orf->attcuspo)
-                    <small>Current File: <a href="{{ asset($orf->attcuspo) }}" target="_blank">View</a></small>
-                @endif
+
+            @php
+                $poAttachmentsCount = $orf->attachments->where('type','attcuspo')->count();
+                $isPoChecked = old('check_po', $orf->check_po) || $poAttachmentsCount > 0 || !empty($orf->attcuspo);
+
+                $drawingAttachmentsCount = $orf->attachments->where('type','sigdraw')->count();
+                $isDrawingChecked = old('check_drawing', $orf->check_drawing) || $drawingAttachmentsCount > 0 || !empty($orf->sigdraw);
+            @endphp
+
+            <!-- Verification Checklist -->
+            <div class="col-lg-12 mt-4">
+                <div class="p-3 border rounded bg-light">
+                    <label class="form-label fw-bold mb-3 text-dark fs-6">Verification Checklist</label>
+                    <div class="row g-3">
+                        <div class="col-md-6 col-6">
+                            <div class="form-check">
+                                <input class="form-check-input orf-verify-check" type="checkbox" name="check_po" id="check_po" value="1" {{ $isPoChecked ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="check_po">PO verified</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-6">
+                            <div class="form-check">
+                                <input class="form-check-input orf-verify-check" type="checkbox" name="check_drawing" id="check_drawing" value="1" {{ $isDrawingChecked ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="check_drawing">Drawing verified</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div> --}}
-        <div class="col-lg-6 mt-4">
-    <label class="fw-bold">Customer PO Attachments</label>
 
-    <div class="attachment-list">
-        @foreach($orf->attachments->where('type','attcuspo') as $file)
-            <div class="d-flex align-items-center mb-2">
-                <a href="{{ asset($file->file_path) }}" target="_blank" class="me-2">
-                    {{ basename($file->file_path) }}
-                </a>
+            <!-- Customer PO Attachments Container -->
+            <div class="col-lg-6 mt-4" id="po_attachments_container" style="{{ $isPoChecked ? '' : 'display: none;' }}">
+                <label class="fw-bold mb-2">Customer PO Attachments</label>
 
-                {{-- Remove --}}
-                <button type="button"
-                        class="btn btn-sm btn-danger remove-attachment"
-                        data-id="{{ $file->id }}">
-                    Remove
-                </button>
+                <div class="attachment-list mb-2">
+                    @foreach($orf->attachments->where('type','attcuspo') as $file)
+                        <div class="d-flex align-items-center justify-content-between p-2 mb-2 border rounded bg-light">
+                            <a href="{{ asset($file->file_path) }}" target="_blank" class="text-truncate me-2 text-primary" style="max-width: 80%;">
+                                <i class="fas fa-file-pdf text-danger me-1"></i> {{ basename($file->file_path) }}
+                            </a>
 
-                {{-- Replace --}}
-                <input type="file"
-                       name="replace_attcuspo[{{ $file->id }}]"
-                       class="form-control form-control-sm ms-2">
+                            {{-- Remove --}}
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger remove-attachment"
+                                    data-id="{{ $file->id }}">
+                                Remove
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Add new --}}
+                <input type="file" name="attcuspo[]" class="form-control" multiple>
             </div>
-        @endforeach
-    </div>
 
-    {{-- Add new --}}
-    <input type="file" name="attcuspo[]" class="form-control mt-2" multiple>
-</div>
+            <!-- Signed Drawing Attachments Container -->
+            <div class="col-lg-6 mt-4" id="drawing_attachments_container" style="{{ $isDrawingChecked ? '' : 'display: none;' }}">
+                <label class="fw-bold mb-2">Signed Drawing Attachments</label>
 
-<div class="col-lg-6 mt-4">
-    <label class="fw-bold">Signed Drawing Attachments</label>
+                <div class="attachment-list mb-2">
+                    @foreach($orf->attachments->where('type','sigdraw') as $file)
+                        <div class="d-flex align-items-center justify-content-between p-2 mb-2 border rounded bg-light">
+                            <a href="{{ asset($file->file_path) }}" target="_blank" class="text-truncate me-2 text-primary" style="max-width: 80%;">
+                                <i class="fas fa-file-pdf text-danger me-1"></i> {{ basename($file->file_path) }}
+                            </a>
 
-    <div class="attachment-list">
-        @foreach($orf->attachments->where('type','sigdraw') as $file)
-            <div class="d-flex align-items-center mb-2">
-                <a href="{{ asset($file->file_path) }}" target="_blank" class="me-2">
-                    {{ basename($file->file_path) }}
-                </a>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger remove-attachment"
+                                    data-id="{{ $file->id }}">
+                                Remove
+                            </button>
+                        </div>
+                    @endforeach
+                </div>
 
-                <button type="button"
-                        class="btn btn-sm btn-danger remove-attachment"
-                        data-id="{{ $file->id }}">
-                    Remove
-                </button>
-
-                <input type="file"
-                       name="replace_sigdraw[{{ $file->id }}]"
-                       class="form-control form-control-sm ms-2">
+                <input type="file" name="sigdraw[]" class="form-control" multiple>
             </div>
-        @endforeach
-    </div>
-
-    <input type="file" name="sigdraw[]" class="form-control mt-2" multiple>
-</div>
 
         {{-- Signed Drawing --}}
         {{-- <div class="col-lg-6 mt-4">
@@ -350,4 +363,45 @@ $countries = DB::table('countries')->where('id',76)->get(); // Fetching all coun
     </form>
     </div>
 </section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var checkPo = document.getElementById('check_po');
+        var checkDrawing = document.getElementById('check_drawing');
+        var poContainer = document.getElementById('po_attachments_container');
+        var drawingContainer = document.getElementById('drawing_attachments_container');
+
+        function toggleContainer(container, isVisible, animate) {
+            if (!container) return;
+            if (window.jQuery && animate) {
+                if (isVisible) {
+                    window.jQuery(container).stop(true, true).slideDown(200);
+                } else {
+                    window.jQuery(container).stop(true, true).slideUp(200);
+                }
+            } else {
+                container.style.display = isVisible ? '' : 'none';
+            }
+        }
+
+        function updateAttachmentVisibility(animate) {
+            toggleContainer(poContainer, checkPo && checkPo.checked, animate);
+            toggleContainer(drawingContainer, checkDrawing && checkDrawing.checked, animate);
+        }
+
+        if (checkPo) {
+            checkPo.addEventListener('change', function () {
+                updateAttachmentVisibility(true);
+            });
+        }
+
+        if (checkDrawing) {
+            checkDrawing.addEventListener('change', function () {
+                updateAttachmentVisibility(true);
+            });
+        }
+
+        updateAttachmentVisibility(false);
+    });
+</script>
 @endsection

@@ -26,10 +26,20 @@ class AccessoryController extends Controller
                 ]);
             }
 
-            $accessories = Accessory::where('product_id', $productId)
-                ->where('status', 'active')
-                ->select('id', 'name', 'price', 'tax_percent')
-                ->get();
+            $product = Product::find($productId);
+            $accessories = $product
+                ? Accessory::availableForProduct($product)
+                    ->map(fn (Accessory $accessory) => $accessory->only(['id', 'name', 'price', 'tax_percent']))
+                : collect();
+
+            if ($accessories->isEmpty() && $request->filled('category_id')) {
+                $accessories = Accessory::where('product_category_id', $request->category_id)
+                    ->where('status', 'active')
+                    ->select('id', 'name', 'price', 'tax_percent')
+                    ->get()
+                    ->unique('name')
+                    ->values();
+            }
 
             return response()->json([
                 'status' => true,

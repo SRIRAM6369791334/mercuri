@@ -43,6 +43,33 @@
             cursor: pointer;
         }
 
+        .no-print .btn-drawing-toolbar {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 8px 14px;
+            color: #0b5fa5;
+            background: #eef6fc;
+            border: 1px solid #0b5fa5;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+
+        .no-print .btn-drawing-toolbar:hover {
+            background: #0b5fa5;
+            color: #fff;
+        }
+
+        .drawing-reference-badge {
+            margin: 3mm 0 4mm;
+            padding: 2.5mm 4mm;
+            background: #f4f8fb;
+            border-left: 3px solid #0b5fa5;
+            font-size: 9.5pt;
+        }
+
         .document-page {
     position: relative;
     width: 210mm;
@@ -148,8 +175,15 @@
 
         .signature { margin-top: 6mm; }
         .signature p { margin-bottom: 0.6mm; }
-        .signature .contact-link {
-            color: #111;
+        .signature .contact-link,
+        .commercial-signature .contact-link,
+        a.contact-link,
+        a.contact-link:visited,
+        a.contact-link:hover,
+        a.contact-link:active,
+        .signature a,
+        .commercial-signature a {
+            color: #000000 !important;
             font-weight: 700;
             text-decoration: underline;
         }
@@ -559,10 +593,23 @@
     $currency = $freight?->currency ?: 'INR';
     $documentAsset = fn (string $path) => ($pdfMode ?? false) ? public_path($path) : asset($path);
     $documentPageNumber = 1;
+
+    $activeGa = $quotation->ga_number ?: ($lead?->ganumber ?: null);
+    $activePit = $quotation->pit_drawing ?: ($lead?->pit_drawing ?: null);
 @endphp
 
 <div class="no-print">
     <button type="button" onclick="window.print()">Print Quotation</button>
+    @if($activeGa)
+        <a href="{{ asset($activeGa) }}" target="_blank" class="btn-drawing-toolbar">
+            📄 View GA Drawing
+        </a>
+    @endif
+    @if($activePit)
+        <a href="{{ asset($activePit) }}" target="_blank" class="btn-drawing-toolbar">
+            📐 View Pit Drawing
+        </a>
+    @endif
 </div>
 
 <section class="document-page first-page">
@@ -596,6 +643,19 @@
         </div>
         <p>We believe this proposal reflects a technically robust and commercially competitive solution that aligns with your expectations. This offer is based on the Mercuriis team's understanding of your requirements.</p>
         <p>We kindly request your team to thoroughly review the drawing &amp; offer to ensure it fully meets your requirements.</p>
+        @if($activeGa || $activePit)
+            <div class="drawing-reference-badge">
+                <strong style="color: #0b5fa5;">Attached Engineering Drawings:</strong>
+                <div style="margin-top: 1.5mm; display: flex; flex-wrap: wrap; gap: 15px;">
+                    @if($activeGa)
+                        <span>📄 <strong>GA Drawing:</strong> {{ basename($activeGa) }}</span>
+                    @endif
+                    @if($activePit)
+                        <span>📐 <strong>Civil Pit Drawing:</strong> {{ basename($activePit) }}</span>
+                    @endif
+                </div>
+            </div>
+        @endif
         <p>We look forward to the opportunity of receiving your esteemed order at the earliest.</p>
         <p>Thank you for your consideration.</p>
         <p>We remain committed to delivering exceptional service and reliable solutions at all times.</p>
@@ -607,8 +667,8 @@
         @if($assignedUser)
             <p style="margin-top: 14px;"><strong>{{ $assignedUser->name }}</strong></p>
             @if($assignedUser->mobilenumber)<p><strong>HP {{ $assignedUser->mobilenumber }}</strong></p>@endif
-            @if($assignedUser->email)<p><a class="contact-link" href="mailto:{{ $assignedUser->email }}">{{ $assignedUser->email }}</a></p>@endif
-            <p><a class="contact-link" href="https://www.mercuriis.com">www.mercuriis.com</a></p>
+            @if($assignedUser->email)<p><a class="contact-link" href="mailto:{{ $assignedUser->email }}" style="color: #000000;">{{ $assignedUser->email }}</a></p>@endif
+            <p><a class="contact-link" href="https://www.mercuriis.com" style="color: #000000;">www.mercuriis.com</a></p>
         @endif
     </div>
 
@@ -657,25 +717,17 @@
             }
         @endphp
 
-        @if($excelHtml)
-            <div class="excel-only-page">{!! $excelHtml !!}</div>
-        @elseif($design?->quotation)
-            <p class="muted">The approved technical quotation is available at {{ asset('storage/'.$design->quotation) }}.</p>
-        @else
-            <p class="muted">No technical quotation file is attached.</p>
-        @endif
-    </section>
-@else
+        {{-- 1. Product Group Feature Images (Universal for Standard & MHE Special) --}}
     @php $shownGroupImages = []; @endphp
     @foreach($quotationProducts as $item)
         @php
             $product = $item->productDetails;
             $groupImage = $productGroupImages->get($item->id);
             $groupImagePath = $groupImage['path'] ?? null;
-            $specifications = $product?->specifications ?? collect();
         @endphp
 
-        @if($product && $specifications->isNotEmpty())
+        @if($product && $groupImagePath && !in_array($groupImagePath, $shownGroupImages, true))
+            @php $shownGroupImages[] = $groupImagePath; @endphp
             @php $documentPageNumber++; @endphp
             <section class="document-page specification-page">
                 @include('quotations.partials.reference-page-chrome', [
@@ -686,35 +738,85 @@
 
                 <div class="specification-sheet">
                     <div class="technical-title">TECHNICAL SPECIFICATION</div>
-                    <div class="product-caption">{{ $item->part_no ?: ($product->partno ?: '-') }} - {{ \App\Helpers\QuotationPresentationHelper::productDescription($product) }}</div>
-                    @if($groupImagePath && !in_array($groupImagePath, $shownGroupImages, true))
-                        @php $shownGroupImages[] = $groupImagePath; @endphp
-                        <div class="specification-group-name">{{ $groupImage['name'] }}</div>
-                        <img class="specification-feature" src="{{ $documentAsset($groupImagePath) }}" alt="{{ $groupImage['name'] }} features">
-                    @endif
-                    <table class="specification-table">
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Unit</th>
-                                <th>Specification</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($specifications as $specification)
-                                <tr>
-                                    <td>{{ $specification->description }}</td>
-                                    <td>{{ $specification->unit }}</td>
-                                    <td>{{ $specification->specification }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                    <div class="specification-group-name">{{ $groupImage['name'] }}</div>
+                    <img class="specification-feature" src="{{ $documentAsset($groupImagePath) }}" alt="{{ $groupImage['name'] }} features">
                 </div>
             </section>
         @endif
     @endforeach
-@endif
+
+    {{-- 2. Technical Specification Details --}}
+    @if($isSpecial)
+        @php $documentPageNumber++; @endphp
+        <section class="document-page">
+            @include('quotations.partials.reference-page-chrome', [
+                'pageNumber' => $documentPageNumber,
+                'decorated' => $documentPageNumber % 2 === 1,
+                'logoSrc' => $documentAsset('assets/images/logom.jpeg'),
+            ])
+
+            <div class="reference-highlight">TECHNICAL SPECIFICATION</div>
+            @php
+                $excelHtml = null;
+                $designExtension = $design?->quotation ? strtolower(pathinfo($design->quotation, PATHINFO_EXTENSION)) : null;
+                if ($design?->quotation && in_array($designExtension, ['xls', 'xlsx', 'csv'], true)) {
+                    $excelPath = storage_path('app/public/'.$design->quotation);
+                    if (file_exists($excelPath)) {
+                        $excelHtml = \App\Helpers\QuotationHelper::renderExcelAsHtml($excelPath, $quotation);
+                    }
+                }
+            @endphp
+
+            @if($excelHtml)
+                <div class="excel-only-page">{!! $excelHtml !!}</div>
+            @elseif($design?->quotation)
+                <p class="muted">The approved technical quotation is available at {{ asset('storage/'.$design->quotation) }}.</p>
+            @else
+                <p class="muted">No technical quotation file is attached.</p>
+            @endif
+        </section>
+    @else
+        @foreach($quotationProducts as $item)
+            @php
+                $product = $item->productDetails;
+                $specifications = $product?->specifications ?? collect();
+            @endphp
+
+            @if($product && $specifications->isNotEmpty())
+                @php $documentPageNumber++; @endphp
+                <section class="document-page specification-page">
+                    @include('quotations.partials.reference-page-chrome', [
+                        'pageNumber' => $documentPageNumber,
+                        'decorated' => $documentPageNumber % 2 === 1,
+                        'logoSrc' => $documentAsset('assets/images/logom.jpeg'),
+                    ])
+
+                    <div class="specification-sheet">
+                        <div class="technical-title">TECHNICAL SPECIFICATION</div>
+                        <div class="product-caption">{{ $item->part_no ?: ($product->partno ?: '-') }} - {{ \App\Helpers\QuotationPresentationHelper::productDescription($product) }}</div>
+                        <table class="specification-table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Unit</th>
+                                    <th>Specification</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($specifications as $specification)
+                                    <tr>
+                                        <td>{{ $specification->description }}</td>
+                                        <td>{{ $specification->unit }}</td>
+                                        <td>{{ $specification->specification }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            @endif
+        @endforeach
+    @endif
 
 @php $documentPageNumber++; @endphp
 <section class="document-page commercial-page">
@@ -875,12 +977,89 @@
                 @if($assignedUser)
                     <p><strong>{{ $assignedUser->name }}</strong></p>
                     @if($assignedUser->mobilenumber)<p><strong>HP {{ $assignedUser->mobilenumber }}</strong></p>@endif
-                    @if($assignedUser->email)<p><a class="contact-link" href="mailto:{{ $assignedUser->email }}">{{ $assignedUser->email }}</a></p>@endif
-                    <p><a class="contact-link" href="https://www.mercuriis.com">www.mercuriis.com</a></p>
+                    @if($assignedUser->email)<p><a class="contact-link" href="mailto:{{ $assignedUser->email }}" style="color: #000000;">{{ $assignedUser->email }}</a></p>@endif
+                    <p><a class="contact-link" href="https://www.mercuriis.com" style="color: #000000;">www.mercuriis.com</a></p>
                 @endif
             </div>
         </div>
     </div>
 </section>
+
+@if($activeGa && preg_match('/\.(jpg|jpeg|png)$/i', $activeGa))
+    @php $documentPageNumber++; @endphp
+    <section class="document-page annexure-page">
+        @include('quotations.partials.reference-page-chrome', [
+            'pageNumber' => $documentPageNumber,
+            'decorated' => $documentPageNumber % 2 === 1,
+            'logoSrc' => $documentAsset('assets/images/logom.jpeg'),
+        ])
+        <div class="page-title" style="margin-bottom: 4mm; font-size: 14pt; color: #0b5fa5; font-weight: bold; border-bottom: 2px solid #0b5fa5; padding-bottom: 2mm;">
+            Annexure &mdash; General Arrangement (GA) Drawing
+        </div>
+        <div style="text-align: center; height: 215mm; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd; padding: 4mm; background: #fafafa;">
+            <img src="{{ $documentAsset($activeGa) }}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="GA Drawing">
+        </div>
+    </section>
+@endif
+
+@if($activePit && preg_match('/\.(jpg|jpeg|png)$/i', $activePit))
+    @php $documentPageNumber++; @endphp
+    <section class="document-page annexure-page">
+        @include('quotations.partials.reference-page-chrome', [
+            'pageNumber' => $documentPageNumber,
+            'decorated' => $documentPageNumber % 2 === 1,
+            'logoSrc' => $documentAsset('assets/images/logom.jpeg'),
+        ])
+        <div class="page-title" style="margin-bottom: 4mm; font-size: 14pt; color: #0b5fa5; font-weight: bold; border-bottom: 2px solid #0b5fa5; padding-bottom: 2mm;">
+            Annexure &mdash; Civil Pit Drawing
+        </div>
+        <div style="text-align: center; height: 215mm; display: flex; align-items: center; justify-content: center; border: 1px solid #ddd; padding: 4mm; background: #fafafa;">
+            <img src="{{ $documentAsset($activePit) }}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Pit Drawing">
+        </div>
+    </section>
+@endif
+
+@if(($activeGa && !preg_match('/\.(jpg|jpeg|png)$/i', $activeGa)) || ($activePit && !preg_match('/\.(jpg|jpeg|png)$/i', $activePit)))
+    @php $documentPageNumber++; @endphp
+    <section class="document-page annexure-page">
+        @include('quotations.partials.reference-page-chrome', [
+            'pageNumber' => $documentPageNumber,
+            'decorated' => $documentPageNumber % 2 === 1,
+            'logoSrc' => $documentAsset('assets/images/logom.jpeg'),
+        ])
+        <div class="page-title" style="margin-bottom: 6mm; font-size: 14pt; color: #0b5fa5; font-weight: bold; border-bottom: 2px solid #0b5fa5; padding-bottom: 2mm;">
+            Annexure &mdash; Engineering Drawing Documents
+        </div>
+        <div style="border: 1px solid #ccd; border-radius: 4px; padding: 6mm; background: #fcfcfc;">
+            <p>The following technical drawings accompany this proposal and are available for review/download:</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 4mm;">
+                <thead>
+                    <tr style="background: #0b5fa5; color: #fff;">
+                        <th style="padding: 3mm; text-align: left;">Drawing Type</th>
+                        <th style="padding: 3mm; text-align: left;">File Name</th>
+                        <th style="padding: 3mm; text-align: center;">Format</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if($activeGa)
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 3mm;">General Arrangement (GA) Drawing</td>
+                        <td style="padding: 3mm;"><strong>{{ basename($activeGa) }}</strong></td>
+                        <td style="padding: 3mm; text-align: center;">{{ strtoupper(pathinfo($activeGa, PATHINFO_EXTENSION)) }}</td>
+                    </tr>
+                    @endif
+                    @if($activePit)
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 3mm;">Civil Pit Layout Drawing</td>
+                        <td style="padding: 3mm;"><strong>{{ basename($activePit) }}</strong></td>
+                        <td style="padding: 3mm; text-align: center;">{{ strtoupper(pathinfo($activePit, PATHINFO_EXTENSION)) }}</td>
+                    </tr>
+                    @endif
+                </tbody>
+            </table>
+            <p style="margin-top: 6mm; font-size: 9.5pt; color: #555;">Note: Digital copies may also be accessed directly via the Mercuriis CRM portal or through the provided links.</p>
+        </div>
+    </section>
+@endif
 </body>
 </html>

@@ -78,20 +78,22 @@ Route::group(['middleware' => 'auth'], function () {
     // lead designation and department
 
     Route::get('/master/designation-department', [MasterController::class, 'viewde'])->name('master.dd');
-Route::post('/master/store', [MasterController::class, 'store'])->name('master.store');
-Route::get('/master/edit/{id}', [MasterController::class, 'edit'])->name('master.edit');
-Route::post('/master/update/{id}', [MasterController::class, 'update'])->name('master.update');
-Route::delete('/master/delete/{id}', [MasterController::class, 'destroy'])->name('master.delete');
-Route::post('/master/quotation-field/store', [MasterController::class, 'storeQuotationField'])->name('master.quotation-field.store');
-Route::get('/master/quotation-field/{type}/{id}/edit', [MasterController::class, 'editQuotationField'])->name('master.quotation-field.edit');
-Route::post('/master/quotation-field/{type}/{id}/update', [MasterController::class, 'updateQuotationField'])->name('master.quotation-field.update');
-Route::delete('/master/quotation-field/{type}/{id}', [MasterController::class, 'destroyQuotationField'])->name('master.quotation-field.delete');
-Route::get('/get-designations', [MasterController::class, 'getDesignations']);
-Route::get('/get-departments', [MasterController::class, 'getDepartments']);
+    Route::post('/master/store', [MasterController::class, 'store'])->name('master.store');
+    Route::get('/master/edit/{id}', [MasterController::class, 'edit'])->name('master.edit');
+    Route::post('/master/update/{id}', [MasterController::class, 'update'])->name('master.update');
+    Route::delete('/master/delete/{id}', [MasterController::class, 'destroy'])->name('master.delete');
+    Route::post('/master/quotation-field/store', [MasterController::class, 'storeQuotationField'])->name('master.quotation-field.store');
+    Route::get('/master/quotation-field/{type}/{id}/edit', [MasterController::class, 'editQuotationField'])->name('master.quotation-field.edit');
+    Route::post('/master/quotation-field/{type}/{id}/update', [MasterController::class, 'updateQuotationField'])->name('master.quotation-field.update');
+    Route::delete('/master/quotation-field/{type}/{id}', [MasterController::class, 'destroyQuotationField'])->name('master.quotation-field.delete');
+    Route::get('/get-designations', [MasterController::class, 'getDesignations']);
+    Route::get('/get-departments', [MasterController::class, 'getDepartments']);
 
 
     // userrout
     Route::view('/users', 'pages.user')->middleware('can:users-display');
+    Route::match(['get'], '/updateuser', fn() => redirect('/users'));
+    Route::match(['get'], '/adduser', fn() => redirect('/users'));
     Route::post('/adduser', [UserController::class, 'store'])->name('users.store')->middleware('can:users-create');
     Route::post('/updateuser', [UserController::class, 'update'])->name('users.update')->middleware('can:users-edit');
     Route::post('/editpassword', [UserController::class, 'updatePassword'])->middleware('can:users-edit');
@@ -107,8 +109,8 @@ Route::get('/get-departments', [MasterController::class, 'getDepartments']);
     Route::post('/edit-category-action', [ProductCategoryController::class, 'editCategoryFunction'])->middleware('can:product-categories-edit');
     Route::get('/delete-category/{catId}', [ProductCategoryController::class, 'deleteCategoryFunction'])->middleware('can:product-categories-delete');
     // web.php
-Route::post('/ajax/add-segment', [ProductCategoryController::class, 'ajaxStore'])
-    ->name('ajax.segment.store')->middleware('can:product-categories-create');
+    Route::post('/ajax/add-segment', [ProductCategoryController::class, 'ajaxStore'])
+        ->name('ajax.segment.store')->middleware('can:product-categories-create');
 
 
     // product sub categories
@@ -118,9 +120,10 @@ Route::post('/ajax/add-segment', [ProductCategoryController::class, 'ajaxStore']
     Route::post('/edit-sub-category-action', [ProductSubCategoryController::class, 'editSubCategoryFunction'])->middleware('can:product-categories-edit');
     Route::get('/delete-sub-category/{Id}', [ProductSubCategoryController::class, 'deleteSubCategoryFunction'])->middleware('can:product-categories-delete');
     // web.php
-    Route::post('/ajax/add-sub-category',
-    [ProductSubCategoryController::class, 'ajaxStore']
-)->name('ajax.subcategory.store')->middleware('can:product-categories-create');
+    Route::post(
+        '/ajax/add-sub-category',
+        [ProductSubCategoryController::class, 'ajaxStore']
+    )->name('ajax.subcategory.store')->middleware('can:product-categories-create');
 
     Route::get('/quotation-groups', [QuotationProductController::class, 'manageImages'])
         ->name('quotation-group-images.index');
@@ -141,19 +144,19 @@ Route::post('/ajax/add-segment', [ProductCategoryController::class, 'ajaxStore']
 
     // products specifictaions routes
 
-   Route::get('/product-specifications',            [ProductSpecificationController::class, 'specifications'])->name('product_specifications.index')->middleware('can:products-display');
-Route::get('/get-product-specifications/{id}',   [ProductSpecificationController::class, 'getSpecifications'])->name('product_specifications.get');
-Route::post('/product-specifications/store',     [ProductSpecificationController::class, 'store'])->name('product_specifications.store')->middleware('can:products-create');
+    Route::get('/product-specifications', [ProductSpecificationController::class, 'specifications'])->name('product_specifications.index')->middleware('can:products-display');
+    Route::get('/get-product-specifications/{id}', [ProductSpecificationController::class, 'getSpecifications'])->name('product_specifications.get');
+    Route::post('/product-specifications/store', [ProductSpecificationController::class, 'store'])->name('product_specifications.store')->middleware('can:products-create');
 
-Route::get(
-    '/bulkupload_spec',
-    [ProductSpecificationController::class, 'bulkUploadForm']
-)->name('bulkupload_spec_form')->middleware('can:products-create');
+    Route::get(
+        '/bulkupload_spec',
+        [ProductSpecificationController::class, 'bulkUploadForm']
+    )->name('bulkupload_spec_form')->middleware('can:products-create');
 
-Route::post(
-    '/bulkupload_spec',
-    [ProductSpecificationController::class, 'bulkUpload']
-)->name('bulkupload_spec')->middleware('can:products-create');
+    Route::post(
+        '/bulkupload_spec',
+        [ProductSpecificationController::class, 'bulkUpload']
+    )->name('bulkupload_spec')->middleware('can:products-create');
 
     // custmorrout
     Route::get('/customer', [CustomerController::class, 'customer'])->name('pages.customer')->middleware('can:customer-display');
@@ -165,7 +168,7 @@ Route::post(
     Route::get('/customer/{id}/edit', [CustomerController::class, 'edit'])->name('customer.edit')->middleware('can:customer-edit');
     Route::put('/customer/{id}', [CustomerController::class, 'update'])->name('customer.update')->middleware('can:customer-edit');
     Route::post('/customer/delete/{id}', [CustomerController::class, 'softDelete'])->name('customer.delete')->middleware('can:customer-delete');
-    
+
     // Expo routes
     Route::get('/expo', [ExpoController::class, 'expo'])->name('pages.expo');
     Route::get('/addexpo', [ExpoController::class, 'create'])->name('pages.expo.add');
@@ -196,10 +199,14 @@ Route::post(
     Route::post('/saveleads', [Controller::class, 'saveleads'])->middleware('can:leads-create');
     Route::get('/get-customer-data/{id}', [CustomerController::class, 'getCustomerData']);
     Route::get('/get-customer-by-gst/{gst}', [CustomerController::class, 'getCustomerByGst']);
+    Route::match(['get', 'post'], '/api/get-addresses-by-gst/{gst?}', [CustomerController::class, 'getAddressesByGst']);
     Route::post('/lead/leupdate-Statusdf', [Controller::class, 'leupdateStatusdf'])->name('lead.leupdateStatusdf');
     Route::post('/lead/update-Statusdf', [Controller::class, 'updateStatusdf'])->name('lead.updateStatusdf');
     Route::post('/upload-document', [Controller::class, 'designapproval'])->name('document.upload');
     Route::get('/get-cities/{state_id}', function ($state_id) {
+        return App\Models\Citylist::where('state_code', $state_id)->get();
+    });
+    Route::match(['get', 'post'], '/api/get-cities/{state_id}', function ($state_id) {
         return App\Models\Citylist::where('state_code', $state_id)->get();
     });
     Route::post('/leads/soft-delete/{id}', [Controller::class, 'softDelete'])->name('leads.softDelete')->middleware('can:leads-delete');
@@ -219,102 +226,110 @@ Route::post(
     Route::post('/leaddesigns/update/{id}', [LeadDesignController::class, 'update'])->name('leaddesigns.update')->middleware('can:design-edit');
     Route::get('/deletedesigns/{id}', [LeadDesignController::class, 'softDeletedesign'])->middleware('can:design-delete');
     Route::get('/settings/assign', [AssignSettingController::class, 'edit'])
-    ->name('assign.settings');
+        ->name('assign.settings');
 
-Route::post('/settings/assign', [AssignSettingController::class, 'update'])
-    ->name('assign.settings.update');
-Route::get('/get-design-specs/{category}/{type}', [Controller::class, 'getSpecs']);
+    Route::post('/settings/assign', [AssignSettingController::class, 'update'])
+        ->name('assign.settings.update');
+    Route::get('/get-design-specs/{category}/{type}', [Controller::class, 'getSpecs']);
 
 
-Route::get('/design-spec-master', [DesignSpecificationMasterController::class, 'create'])
-    ->name('design.spec.master.create');
+    Route::get('/design-spec-master', [DesignSpecificationMasterController::class, 'create'])
+        ->name('design.spec.master.create');
 
-Route::post('/design-spec-master/store', [DesignSpecificationMasterController::class, 'store'])
-    ->name('design.spec.master.store');
-    Route::get('/design-spec-master/{id}/edit',
-    [DesignSpecificationMasterController::class, 'edit'])
-    ->name('design.spec.master.edit');
-
-Route::put('/design-spec-master/{id}/update',
-    [DesignSpecificationMasterController::class, 'update'])
-    ->name('design.spec.master.update');
-
-Route::delete('/design-spec-master/{id}',
-    [DesignSpecificationMasterController::class, 'destroy'])
-    ->name('design.spec.master.delete');
+    Route::post('/design-spec-master/store', [DesignSpecificationMasterController::class, 'store'])
+        ->name('design.spec.master.store');
     Route::get(
-    '/design-specs/{category}/{type}',
-    [DesignSpecificationMasterController::class, 'getSpecs']
-)->name('design.specs.fetch');
+        '/design-spec-master/{id}/edit',
+        [DesignSpecificationMasterController::class, 'edit']
+    )
+        ->name('design.spec.master.edit');
 
-Route::post('/design/assign-designer', [Controller::class, 'assignDesigner'])
-    ->name('design.assign');
-Route::get(
-    '/design/specifications/{designId}',
-    [Controller::class, 'viewSpecifications']
-)->name('design.specifications.view');
+    Route::put(
+        '/design-spec-master/{id}/update',
+        [DesignSpecificationMasterController::class, 'update']
+    )
+        ->name('design.spec.master.update');
 
-Route::post('/design/upload-files', [Controller::class, 'uploadFiles'])
-    ->name('design.upload.files');
-Route::get('/designs/{design}/quotation', [Controller::class, 'viewQuotationd']);
-Route::get('/designs/{design}/drawing', [Controller::class, 'viewDrawing']);
+    Route::delete(
+        '/design-spec-master/{id}',
+        [DesignSpecificationMasterController::class, 'destroy']
+    )
+        ->name('design.spec.master.delete');
+    Route::get(
+        '/design-specs/{category}/{type}',
+        [DesignSpecificationMasterController::class, 'getSpecs']
+    )->name('design.specs.fetch');
 
-Route::post('/designs/move-to-quotation', [Controller::class, 'moveToQuotation']);
-Route::post('/design/return', [Controller::class, 'returnDesign'])
-    ->name('design.return');
+    Route::post('/design/assign-designer', [Controller::class, 'assignDesigner'])
+        ->name('design.assign');
+    Route::get(
+        '/design/specifications/{designId}',
+        [Controller::class, 'viewSpecifications']
+    )->name('design.specifications.view');
 
-Route::get('/design/edit-data/{designId}', [Controller::class, 'getEditData']);
+    Route::post('/design/upload-files', [Controller::class, 'uploadFiles'])
+        ->name('design.upload.files');
+    Route::get('/designs/{design}/quotation', [Controller::class, 'viewQuotationd']);
+    Route::get('/designs/{design}/drawing', [Controller::class, 'viewDrawing']);
 
-Route::post('/design/update-after-return', [Controller::class, 'updateAfterReturn'])
-    ->name('design.update.after.return');
+    Route::post('/designs/move-to-quotation', [Controller::class, 'moveToQuotation']);
+    Route::post('/design/return', [Controller::class, 'returnDesign'])
+        ->name('design.return');
 
-Route::get('/design-engineer/designs', [Controller::class, 'designEngineerList'])
-    ->middleware('auth')
-    ->name('design.engineer.list');
-Route::get('/design/{id}/edit', [Controller::class, 'edit'])
-    ->name('design.edit');
+    Route::get('/design/edit-data/{designId}', [Controller::class, 'getEditData']);
+
+    Route::post('/design/update-after-return', [Controller::class, 'updateAfterReturn'])
+        ->name('design.update.after.return');
+
+    Route::get('/design-engineer/designs', [Controller::class, 'designEngineerList'])
+        ->middleware('auth')
+        ->name('design.engineer.list');
+    Route::get('/design/{id}/edit', [Controller::class, 'edit'])
+        ->name('design.edit');
     Route::post('/design/{id}/update-files', [Controller::class, 'updateFiles'])
-    ->name('design.update.files');
-Route::get('/design/drawings/{design}',
-    [Controller::class, 'getuploadDesignDrawings']
-)->name('design.drawings');
+        ->name('design.update.files');
+    Route::get(
+        '/design/drawings/{design}',
+        [Controller::class, 'getuploadDesignDrawings']
+    )->name('design.drawings');
 
-Route::post('/design/upload-drawings',
-    [Controller::class, 'uploadDrawings']
-)->name('design.upload.drawings');
+    Route::post(
+        '/design/upload-drawings',
+        [Controller::class, 'uploadDrawings']
+    )->name('design.upload.drawings');
 
-Route::get(
-    '/design/drawing-approval/{design}',
-    [Controller::class, 'getDrawingApproval']
-)->name('design.drawing.approval');
+    Route::get(
+        '/design/drawing-approval/{design}',
+        [Controller::class, 'getDrawingApproval']
+    )->name('design.drawing.approval');
 
-// 🔹 Save approval / rejection (SALES ONLY)
-Route::post(
-    '/design/drawing-approval',
-    [Controller::class, 'saveDrawingApproval']
-)->name('design.drawing.approval.save');
-Route::get(
-    '/design/rejected-drawings/{design}',
-    [Controller::class, 'getRejectedDrawings']
-);
+    // 🔹 Save approval / rejection (SALES ONLY)
+    Route::post(
+        '/design/drawing-approval',
+        [Controller::class, 'saveDrawingApproval']
+    )->name('design.drawing.approval.save');
+    Route::get(
+        '/design/rejected-drawings/{design}',
+        [Controller::class, 'getRejectedDrawings']
+    );
 
-Route::post(
-    '/design/rejected-drawings/update',
-    [Controller::class, 'updateRejectedDrawings']
-);
-Route::post('/design/approved-drawings', [Controller::class, 'approvedDrawings'])
-    ->name('design.approved.drawings');
+    Route::post(
+        '/design/rejected-drawings/update',
+        [Controller::class, 'updateRejectedDrawings']
+    );
+    Route::post('/design/approved-drawings', [Controller::class, 'approvedDrawings'])
+        ->name('design.approved.drawings');
 
-Route::post(
-    '/design/send-drawing-mail',
-    [Controller::class, 'sendSingleDrawingMail']
-)->name('design.send.single.drawing.mail');
+    Route::post(
+        '/design/send-drawing-mail',
+        [Controller::class, 'sendSingleDrawingMail']
+    )->name('design.send.single.drawing.mail');
 
-/* SEND ALL DRAWINGS MAIL */
-Route::post(
-    '/design/send-all-drawings-mail',
-    [Controller::class, 'sendAllDrawingsMail']
-)->name('design.send.all.drawings.mail');
+    /* SEND ALL DRAWINGS MAIL */
+    Route::post(
+        '/design/send-all-drawings-mail',
+        [Controller::class, 'sendAllDrawingsMail']
+    )->name('design.send.all.drawings.mail');
 
     // quoto
     Route::get('/singlequota/{leadid}', [Controller::class, 'singlequota'])->name('single.quota')->middleware('can:quotation-display');
@@ -330,20 +345,20 @@ Route::post(
 
     Route::post('/approve-lead/{id}', [Controller::class, 'approvemovequto']);
     Route::get('/viewmovequto', [Controller::class, 'moveQuotationApproval']);
-Route::post('/leads/update-closure-date', [Controller::class, 'updateClosureDate'])
-    ->name('leads.update-closure-date');
+    Route::post('/leads/update-closure-date', [Controller::class, 'updateClosureDate'])
+        ->name('leads.update-closure-date');
     Route::post('/quotation/send-mail/{id}', [Controller::class, 'sendQuotationMail']);
     Route::post('/quotation/mark-sent/{id}', [Controller::class, 'markQuotationSent'])->name('quotation.mark-sent');
-Route::get('/settings/mail', [MailsettingController::class, 'edit'])->name('mail.settings');
-Route::post('/settings/mail', [MailsettingController::class, 'update'])->name('mail.settings.update');
+    Route::get('/settings/mail', [MailsettingController::class, 'edit'])->name('mail.settings');
+    Route::post('/settings/mail', [MailsettingController::class, 'update'])->name('mail.settings.update');
 
-Route::get('/quotation-charge-approvals', [App\Http\Controllers\QuotationChargeApprovalController::class, 'pending'])->name('quotation.charges.index');
-Route::post('/quotation-charge-approvals/update/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charge.update');
-Route::post('/quotation-charge-approvals/decide/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charges.decide');
+    Route::get('/quotation-charge-approvals', [App\Http\Controllers\QuotationChargeApprovalController::class, 'pending'])->name('quotation.charges.index');
+    Route::post('/quotation-charge-approvals/update/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charge.update');
+    Route::post('/quotation-charge-approvals/decide/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charges.decide');
 
-Route::get('/quotation-term-approvals', [App\Http\Controllers\QuotationChargeApprovalController::class, 'pendingTerms'])->name('quotation.terms.index');
-Route::post('/quotation-term-approvals/update/{id}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decideTerms'])->name('quotation.term.update');
-Route::post('/quotation-term-approvals/decide/{id}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decideTerms'])->name('quotation.terms.decide');
+    Route::get('/quotation-term-approvals', [App\Http\Controllers\QuotationChargeApprovalController::class, 'pendingTerms'])->name('quotation.terms.index');
+    Route::post('/quotation-term-approvals/update/{id}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decideTerms'])->name('quotation.term.update');
+    Route::post('/quotation-term-approvals/decide/{id}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decideTerms'])->name('quotation.terms.decide');
 
     Route::post('/approve-quto/{id}', [Controller::class, 'approvequto'])->middleware('can:quotation-approval');
     Route::post('/approve-disc/{id}', [Controller::class, 'approvedisc'])->middleware('can:discount-approval');
@@ -369,7 +384,7 @@ Route::post('/quotation-term-approvals/decide/{id}', [App\Http\Controllers\Quota
 
     Route::get('/orf/{orf}/attachments/{type}', [OrfController::class, 'getAttachments']);
 
-Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']);
+    Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']);
 
 
     // activities
@@ -400,7 +415,7 @@ Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']
     Route::get('/vendors', [VendorController::class, 'viewVendors'])->name('pages.vendor.vendorList')->middleware('can:vendors-display');
     Route::view('/add-vendors', 'pages.vendor.addVendors')->name('pages.vendor.addVendors')->middleware('can:vendors-create');
     Route::get('/edit-vendors/{vendorId}', [VendorController::class, 'vendorEditDetails'])->middleware('can:vendors-edit');
-    Route::get('/delete-vendors/{vendorId}', [VendorController::class, 'deleteVendor'])->middleware('can:vendors-delete');
+    Route::post('/delete-vendors/{vendorId}', [VendorController::class, 'deleteVendor'])->middleware('can:vendors-delete');
     Route::post('/saveVendors', [VendorController::class, 'saveVendors'])->name('add-vendors')->middleware('can:vendors-create');
     Route::post('/editVendors', [VendorController::class, 'editVendors'])->name('edit-vendors')->middleware('can:vendors-edit');
     Route::get('/get-vendors/{productId}', [VendorController::class, 'getVendorDetails']);
@@ -409,7 +424,7 @@ Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']
     // purchase order routes
     Route::get('/purchase-order-details', [PurchaseOrderController::class, 'viewPurchaseOrder'])->name('purchase-order-details-page')->middleware('can:purchase-order-display');
     Route::get('/create-po', [PurchaseOrderController::class, 'createPoView'])->name('pages.vendor.create-po')->middleware('can:purchase-order-create');
-    Route::get('/po-delete/{poId}', [PurchaseOrderController::class, 'deletePO'])->middleware('can:purchase-order-delete');
+    Route::post('/po-delete/{poId}', [PurchaseOrderController::class, 'deletePO'])->middleware('can:purchase-order-delete');
     Route::get('/po-invoice/{invoiceId}', [PurchaseOrderController::class, 'viewPOInvoice'])->where('invoiceId', '.*');
     Route::post('/save-po', [PurchaseOrderController::class, 'savePo'])->middleware('can:purchase-order-create');
     Route::get('/edit-po-data/{poNo}', [PurchaseOrderController::class, 'poEditDetails'])->where('poNo', '.*')->middleware('can:purchase-order-edit');
@@ -419,13 +434,20 @@ Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']
     Route::post('/vendor/get-po-prodetails', [PurchaseOrderController::class, 'getPoProDetails']);
     Route::post('/customer/get-by-gst', [PurchaseOrderController::class, 'getCustomerByGst']);
     Route::post('/vendor/get-branches', [PurchaseOrderController::class, 'getVendorBranches']);
+    Route::match(['get', 'post'], '/vendor/get-segment-terms/{catId}/{productId?}', [PurchaseOrderController::class, 'getSegmentTermsJson']);
     Route::get('/po-download-merged/{poNo}', [PurchaseOrderController::class, 'downloadMergedPo'])->where('poNo', '.*');
+    Route::post('/po/request-advance', [PurchaseOrderController::class, 'requestAdvance'])->name('po.request-advance');
+    Route::post('/po/sir-approval', [PurchaseOrderController::class, 'sirApproveAdvance'])->name('po.sir-approval');
+    Route::post('/po/sir-approve-advance', [PurchaseOrderController::class, 'sirApproveAdvance'])->name('po.sir-approve-advance');
+    Route::post('/po/finance-release', [PurchaseOrderController::class, 'financeReleaseAdvance'])->name('po.finance-release');
+    Route::post('/po/finance-release-advance', [PurchaseOrderController::class, 'financeReleaseAdvance'])->name('po.finance-release-advance');
+    Route::post('/po/update-milestone', [PurchaseOrderController::class, 'updatePoMilestone'])->name('po.update-milestone');
 
 
     // purchase entry routes
     Route::view('/purchase-entry', "pages.vendor.purchase_entry.purchaseEntry")->name('purchase-entry-details')->middleware('can:purchase-entry-display');
     Route::view('/add-purchase-entry', 'pages.vendor.purchase_entry.addPurchaseEntry')->name('pages.vendor.add-purchase-entry')->middleware('can:purchase-entry-create');
-    Route::get('/pe-delete/{peId}/{oldQty}/{proId}', [PurchaseEntryController::class, 'deletePE'])->middleware('can:purchase-entry-delete');
+    Route::match(['get', 'post', 'delete'], '/pe-delete/{peId}/{oldQty?}/{proId?}', [PurchaseEntryController::class, 'deletePE'])->middleware('can:purchase-entry-delete');
     Route::post('/save-pe', [PurchaseEntryController::class, 'savePE'])->middleware('can:purchase-entry-create');
     Route::post('/edit-pe', [PurchaseEntryController::class, 'editPE'])->middleware('can:purchase-entry-edit');
     Route::get('/edit-pe-data/{peId}', [PurchaseEntryController::class, 'editPEDetails'])->middleware('can:purchase-entry-edit');
@@ -479,8 +501,8 @@ Route::delete('/orf-attachment/{id}', [OrfController::class, 'deleteAttachment']
     // bulk upload]
     Route::post('/customer-bulk-upload', [CustomerController::class, 'bulkUploadCustomers'])->name('customer.bulk-upload');
     Route::post('/product-bulk-upload', [ProductController::class, 'bulkUploadProduct']);
-    Route::get('/bulk-upload-master',  [ProductController::class, 'bulkUploadMasterView'])->name('bulk-upload.master.view');
-Route::post('/bulk-upload-master', [ProductController::class, 'bulkUploadMaster'])->name('bulk-upload.master');
+    Route::get('/bulk-upload-master', [ProductController::class, 'bulkUploadMasterView'])->name('bulk-upload.master.view');
+    Route::post('/bulk-upload-master', [ProductController::class, 'bulkUploadMaster'])->name('bulk-upload.master');
 
     // setting page route
     Route::view('/settings', 'pages.admin_settings');
@@ -490,78 +512,79 @@ Route::post('/bulk-upload-master', [ProductController::class, 'bulkUploadMaster'
     // hrmodule
 
     // Department
-   Route::get('/department', [DepartmentController::class,'department']);
-   Route::post('/designationinser', [DepartmentController::class, 'store'])->name('department.store');
-   Route::post('designationupdate', [DepartmentController::class, 'designationupdate'])->name('department.update');
-   Route::delete('/department/{id}', [DepartmentController::class, 'destroy'])->name('department.destroy');
+    Route::get('/department', [DepartmentController::class, 'department']);
+    Route::post('/designationinser', [DepartmentController::class, 'store'])->name('department.store');
+    Route::post('designationupdate', [DepartmentController::class, 'designationupdate'])->name('department.update');
+    Route::delete('/department/{id}', [DepartmentController::class, 'destroy'])->name('department.destroy');
 
 
 
     // addemployee
-     Route::get('/employeelist', [AddEmployeeController::class, 'employeelist'])->name('employee.list');
-     Route::view('/addemployee', 'pages.hr.addemployee');
-     Route::post('/Addemployeeinsert', [AddEmployeeController::class, 'Addemployeeinsert'])->name('employee.insert');
-     Route::delete('/employee/{id}', [AddEmployeeController::class, 'destroy'])->name('employee.destroy');
-     Route::get('/editemployee/{id}', [AddEmployeeController::class, 'edit'])->name('employee.edit');
-     Route::post('/editemployeeupdate', [AddEmployeeController::class, 'editemployeeupdate'])->name('employee.update');
-     Route::get('/employee-report/{id}', [AddEmployeeController::class, 'showEmployeeReport'])->name('employee.report');
+    Route::get('/employeelist', [AddEmployeeController::class, 'employeelist'])->name('employee.list');
+    Route::view('/addemployee', 'pages.hr.addemployee');
+    Route::post('/Addemployeeinsert', [AddEmployeeController::class, 'Addemployeeinsert'])->name('employee.insert');
+    Route::delete('/employee/{id}', [AddEmployeeController::class, 'destroy'])->name('employee.destroy');
+    Route::get('/editemployee/{id}', [AddEmployeeController::class, 'edit'])->name('employee.edit');
+    Route::post('/editemployeeupdate', [AddEmployeeController::class, 'editemployeeupdate'])->name('employee.update');
+    Route::get('/employee-report/{id}', [AddEmployeeController::class, 'showEmployeeReport'])->name('employee.report');
 
-     // addasset
-     Route::view('/addassets', 'pages.hr.addassets');
-     Route::get('/employeeassetlist', [AddassetController::class,'assetdetaillist']);
-     Route::post('addnewassetinsert',[AddassetController::class,'addnewassetinsert']);
-     Route::get('gettsupprod',[AddassetController::class,'gettsupprod']);
-     Route::post('assetdetailinsert',[AddassetController::class,'assetdetailinsert']);
-     Route::get('/employeeassetreport/{id}', [AddassetController::class,'employeeassetreport']);
-     Route::get('/employee-assets/edit/{id}', [AddassetController::class, 'edit']);
-     Route::post('/employee-assets/return', [AddassetController::class, 'return'])->name('employee-assets.return');
+    // addasset
+    Route::view('/addassets', 'pages.hr.addassets');
+    Route::get('/employeeassetlist', [AddassetController::class, 'assetdetaillist']);
+    Route::post('addnewassetinsert', [AddassetController::class, 'addnewassetinsert']);
+    Route::get('gettsupprod', [AddassetController::class, 'gettsupprod']);
+    Route::post('assetdetailinsert', [AddassetController::class, 'assetdetailinsert']);
+    Route::get('/employeeassetreport/{id}', [AddassetController::class, 'employeeassetreport']);
+    Route::get('/employee-assets/edit/{id}', [AddassetController::class, 'edit']);
+    Route::post('/employee-assets/return', [AddassetController::class, 'return'])->name('employee-assets.return');
 
-// addadvance
-Route::get('/employee-advance/all', [EmployeeAdvanceController::class, 'listshow'])->name('employee.advance.index');
-Route::get('/employee-advance/create', [EmployeeAdvanceController::class, 'create'])->name('employee.advance.create');
-Route::post('/employee-advance/store', [EmployeeAdvanceController::class, 'store'])->name('employee.advance.store');
-Route::get('/employee-advance/employee/{id}', [EmployeeAdvanceController::class, 'show'])->name('employee.advance.show');
+    // addadvance
+    Route::get('/employee-advance/all', [EmployeeAdvanceController::class, 'listshow'])->name('employee.advance.index');
+    Route::get('/employee-advance/create', [EmployeeAdvanceController::class, 'create'])->name('employee.advance.create');
+    Route::post('/employee-advance/store', [EmployeeAdvanceController::class, 'store'])->name('employee.advance.store');
+    Route::get('/employee-advance/employee/{id}', [EmployeeAdvanceController::class, 'show'])->name('employee.advance.show');
 
-// attendance
-Route::get('/attendancelist', [AttendanceController::class, 'attendancelist'])->name('attendance.list');
-Route::post('/attendance/punchin', [AttendanceController::class, 'punchIn'])->name('attendance.punchin');
-
-
-Route::get('/addholiday', [AttendanceController::class,'addholiday']);
-Route::post('/Addholidayinsert', [AttendanceController::class, 'Addholidayinsert'])->name('Addholidayinsert');
-Route::post('editholidayinsert', [AttendanceController::class,'editholidayinsert']);
-Route::delete('deleteholiday/{id}', [AttendanceController::class, 'deleteholiday']);
-
-Route::get('/get-products-by-category/{categoryId}', [ProductController::class, 'getProductsByCategory']);
-
-Route::get('/date-of-validity', [DateOfValidityController::class, 'dovvv']);
-Route::post('/date-of-validity/store', [DateOfValidityController::class, 'store'])->name('dov.store');
-Route::get('/date-of-validity/edit/{id}', [DateOfValidityController::class, 'edit']);
-Route::post('/date-of-validity/update/{id}', [DateOfValidityController::class, 'update']);
-Route::delete('/date-of-validity/delete/{id}', [DateOfValidityController::class, 'delete']);
+    // attendance
+    Route::get('/attendancelist', [AttendanceController::class, 'attendancelist'])->name('attendance.list');
+    Route::post('/attendance/punchin', [AttendanceController::class, 'punchIn'])->name('attendance.punchin');
 
 
+    Route::get('/addholiday', [AttendanceController::class, 'addholiday']);
+    Route::post('/Addholidayinsert', [AttendanceController::class, 'Addholidayinsert'])->name('Addholidayinsert');
+    Route::post('editholidayinsert', [AttendanceController::class, 'editholidayinsert']);
+    Route::delete('deleteholiday/{id}', [AttendanceController::class, 'deleteholiday']);
+
+    Route::get('/get-products-by-category/{categoryId}', [ProductController::class, 'getProductsByCategory']);
+
+    Route::get('/date-of-validity', [DateOfValidityController::class, 'dovvv']);
+    Route::post('/date-of-validity/store', [DateOfValidityController::class, 'store'])->name('dov.store');
+    Route::get('/date-of-validity/edit/{id}', [DateOfValidityController::class, 'edit']);
+    Route::post('/date-of-validity/update/{id}', [DateOfValidityController::class, 'update']);
+    Route::delete('/date-of-validity/delete/{id}', [DateOfValidityController::class, 'delete']);
 
 
-Route::middleware(['auth'])->prefix('master')->group(function () {
-    Route::post('accessories/bulk-upload', [AccessoryController::class, 'bulkUpload'])->name('accessories.bulk_upload');
-    Route::resource('accessories', AccessoryController::class);
-});
 
-// AJAX routes for accessories (called directly from root URL in JS)
-Route::get('/get-accproducts/{category}', [AccessoryController::class, 'getProducts']);
-Route::match(['get', 'post'], '/fetchTableData', [AttendanceController::class, 'attendancelist']);
-Route::get('/api/get-accessories-by-product/{id}', [AccessoryController::class, 'fetchTableData']);
 
-Route::get('/quotation-charge-approvals', [App\Http\Controllers\QuotationChargeApprovalController::class, 'pending'])->name('quotation.charges.index');
-Route::post('/quotation-charge-approvals/update/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charge.update');
-Route::post('/quotation-charge-approvals/decide/{quotation}', [App\Http\Controllers\QuotationChargeApprovalController::class, 'decide'])->name('quotation.charges.decide');
+    Route::middleware(['auth'])->prefix('master')->group(function () {
+        Route::post('accessories/bulk-upload', [AccessoryController::class, 'bulkUpload'])->name('accessories.bulk_upload');
+        Route::resource('accessories', AccessoryController::class);
+    });
 
-Route::get('/session-keep-alive', function () {
-    return response()->json([
-        'status' => 'alive',
-        'csrf' => csrf_token(),
-    ]);
-})->name('session.keepalive');
+    // AJAX routes for accessories (called directly from root URL in JS)
+    Route::get('/get-accproducts/{category}', [AccessoryController::class, 'getProducts']);
+    Route::match(['get', 'post'], '/fetchTableData', [AttendanceController::class, 'attendancelist']);
+    Route::get('/api/get-accessories-by-product/{id}', [AccessoryController::class, 'fetchTableData']);
+
+    // User Notification System (Dispatch Reminders & System Alerts)
+    Route::get('/notifications/recent', [App\Http\Controllers\NotificationController::class, 'getRecent'])->name('notifications.recent');
+    Route::post('/notifications/{id}/mark-as-read', [App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.mark-as-read');
+    Route::post('/notifications/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+
+    Route::get('/session-keep-alive', function () {
+        return response()->json([
+            'status' => 'alive',
+            'csrf' => csrf_token(),
+        ]);
+    })->name('session.keepalive');
 
 });

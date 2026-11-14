@@ -143,6 +143,18 @@
         </table>
     </div>
 
+    @if (!empty($firstPo->technical_specification))
+        <!-- Global Technical Specifications (Audio Requirement) -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 10px; margin-bottom: 12px; font-size: 8.5pt;">
+            <div style="font-weight: bold; color: #1e40af; margin-bottom: 4px; text-transform: uppercase;">
+                Scope of Supply &amp; Technical Parameters:
+            </div>
+            <div style="color: #1e293b; line-height: 1.45;">
+                {!! nl2br(e($firstPo->technical_specification)) !!}
+            </div>
+        </div>
+    @endif
+
     @foreach ($poDetails as $idx => $item)
         @php
             $prod = $item->productDetails;

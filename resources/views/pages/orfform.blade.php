@@ -330,43 +330,70 @@ $countries = DB::table('countries')->where('id',76)->get(); // Fetching all coun
                     <input type="date" name="podate" style="text-transform:uppercase;" value=""  class="form-control" required>
                 </div>
             </div>
+
+            @php
+                $isPoChecked = old('check_po', false);
+                $isDrawingChecked = old('check_drawing', false);
+            @endphp
+
+            <!-- Verification Checklist -->
+            <div class="col-lg-12 mt-4">
+                <div class="p-3 border rounded bg-light">
+                    <label class="form-label fw-bold mb-3 text-dark fs-6">Verification Checklist</label>
+                    <div class="row g-3">
+                        <div class="col-md-6 col-6">
+                            <div class="form-check">
+                                <input class="form-check-input orf-verify-check" type="checkbox" name="check_po" id="check_po" value="1" {{ $isPoChecked ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="check_po">PO verified</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-6">
+                            <div class="form-check">
+                                <input class="form-check-input orf-verify-check" type="checkbox" name="check_drawing" id="check_drawing" value="1" {{ $isDrawingChecked ? 'checked' : '' }}>
+                                <label class="form-check-label fw-semibold" for="check_drawing">Drawing verified</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- CUSTOMER PO -->
-<div class="col-lg-6 mt-3">
-    <label class="form-label fw-bold">Attachment Customer PO</label>
+            <div class="col-lg-6 mt-3" id="po_attachments_container" style="{{ $isPoChecked ? '' : 'display: none;' }}">
+                <label class="form-label fw-bold">Attachment Customer PO</label>
 
-    <div id="attcuspoPreview" class="attachment-list"></div>
+                <div id="attcuspoPreview" class="attachment-list"></div>
 
-    <button type="button"
-            class="btn btn-sm btn-outline-primary select-filee"
-            data-input="attcuspoInput">
-        Attach
-    </button>
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary select-filee"
+                        data-input="attcuspoInput">
+                    Attach
+                </button>
 
-    <input type="file"
-           id="attcuspoInput"
-           name="attcuspo[]"
-           class="d-none"
-           multiple>
-</div>
+                <input type="file"
+                       id="attcuspoInput"
+                       name="attcuspo[]"
+                       class="d-none"
+                       multiple>
+            </div>
 
-<!-- SIGNED DRAWING -->
-<div class="col-lg-6 mt-3">
-    <label class="form-label fw-bold">Attachment Signed Drawing</label>
+            <!-- SIGNED DRAWING -->
+            <div class="col-lg-6 mt-3" id="drawing_attachments_container" style="{{ $isDrawingChecked ? '' : 'display: none;' }}">
+                <label class="form-label fw-bold">Attachment Signed Drawing</label>
 
-    <div id="sigdrawPreview" class="attachment-list"></div>
+                <div id="sigdrawPreview" class="attachment-list"></div>
 
-    <button type="button"
-            class="btn btn-sm btn-outline-primary select-filee"
-            data-input="sigdrawInput">
-        Attach
-    </button>
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary select-filee"
+                        data-input="sigdrawInput">
+                    Attach
+                </button>
 
-    <input type="file"
-           id="sigdrawInput"
-           name="sigdraw[]"
-           class="d-none"
-           multiple>
-</div>
+                <input type="file"
+                       id="sigdrawInput"
+                       name="sigdraw[]"
+                       class="d-none"
+                       multiple>
+            </div>
 
 
             {{-- <div class="col-lg-6 mt-3">
@@ -404,6 +431,47 @@ $countries = DB::table('countries')->where('id',76)->get(); // Fetching all coun
     </form>
     </div>
 </section>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var checkPo = document.getElementById('check_po');
+        var checkDrawing = document.getElementById('check_drawing');
+        var poContainer = document.getElementById('po_attachments_container');
+        var drawingContainer = document.getElementById('drawing_attachments_container');
+
+        function toggleContainer(container, isVisible, animate) {
+            if (!container) return;
+            if (window.jQuery && animate) {
+                if (isVisible) {
+                    window.jQuery(container).stop(true, true).slideDown(200);
+                } else {
+                    window.jQuery(container).stop(true, true).slideUp(200);
+                }
+            } else {
+                container.style.display = isVisible ? '' : 'none';
+            }
+        }
+
+        function updateAttachmentVisibility(animate) {
+            toggleContainer(poContainer, checkPo && checkPo.checked, animate);
+            toggleContainer(drawingContainer, checkDrawing && checkDrawing.checked, animate);
+        }
+
+        if (checkPo) {
+            checkPo.addEventListener('change', function () {
+                updateAttachmentVisibility(true);
+            });
+        }
+
+        if (checkDrawing) {
+            checkDrawing.addEventListener('change', function () {
+                updateAttachmentVisibility(true);
+            });
+        }
+
+        updateAttachmentVisibility(false);
+    });
+</script>
 @endsection
 
 

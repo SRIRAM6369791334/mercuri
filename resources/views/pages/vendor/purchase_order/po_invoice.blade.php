@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Order - {{ $poDetails[0]->po_no ?? 'PO' }}</title>
+    <title>Purchase Order - {{ $poDetails->first()?->po_no ?? 'PO' }}</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -334,7 +334,7 @@
     <button onclick="window.print();" style="background:#1b5583;">
         <i class="fas fa-print"></i> Print / Save Purchase Order PDF
     </button>
-    <a href="/po-download-merged/{{ $poDetails[0]->po_no }}" target="_blank" style="text-decoration:none;">
+    <a href="/po-download-merged/{{ $poDetails->first()?->po_no }}" target="_blank" style="text-decoration:none;">
         <button type="button" style="background:#0d9488;">
             <i class="fas fa-file-pdf"></i> Download Complete Merged Package (PO + Tech Specs + Approved Drawing + Quote)
         </button>
@@ -342,46 +342,69 @@
 </div>
 
 @php
-    $firstPo = $poDetails[0];
+    $firstPo = $poDetails->first();
     $vendor = $firstPo->allVendorDetails;
     $city = $vendor ? App\Models\Citylist::where('id', $vendor->city_id)->first() : null;
     $state = $vendor ? App\Models\Statelist::where('id', $vendor->state_id)->first() : null;
 
-    $poDate = $firstPo->created_at ? \Carbon\Carbon::parse($firstPo->created_at)->format('d-m-Y') : date('d-m-Y');
+    $poDateSource = $firstPo->po_date ?: $firstPo->created_at;
+    $poDate = $poDateSource ? \Carbon\Carbon::parse($poDateSource)->format('d-m-Y') : date('d-m-Y');
     $poNumber = $firstPo->po_no;
 
     // Totals accumulation
     $totalQty = 0;
     $basicTotal = 0;
-
-    foreach ($poDetails as $item) {
-        $totalQty += (int) $item->product_qty;
-        $basicTotal += (float) ($item->product_total_price ?: ($item->product_qty * $item->unit_price));
-    }
-
-    $discountPct = (float)($firstPo->discount_percentage ?? 0);
-    $discountAmt = (float)($firstPo->discount_amount ?: (($basicTotal * $discountPct) / 100));
-    $netTaxable = $basicTotal - $discountAmt;
     $freightCharges = (float)($firstPo->freight_charges ?? 0);
     $unloadingCharges = (float)($firstPo->unloading_charges ?? 0);
-
+    $discountPct = (float) ($firstPo->overall_discount_percentage ?? 0);
+    $lineDiscountTotal = 0;
+    $overallDiscountTotal = 0;
+    $netTaxable = 0;
     $gstTotal = 0;
     foreach ($poDetails as $item) {
+        $totalQty += (int) $item->product_qty;
         $lineBasic = (float) ($item->product_total_price ?: ($item->product_qty * $item->unit_price));
-        $lineTaxable = $lineBasic - (($lineBasic * $discountPct) / 100);
-        $lineGstRate = (float) ($item->productDetails?->gst ?? 18);
-        $gstTotal += ($lineTaxable / 100) * $lineGstRate;
+        $lineDiscountPct = (float) ($item->discount_percentage ?? 0);
+        $lineDiscount = $item->discount_amount !== null
+            ? (float) $item->discount_amount
+            : round($lineBasic * $lineDiscountPct / 100, 2);
+        $overallDiscountPct = (float) ($item->overall_discount_percentage ?? 0);
+        $afterLineDiscount = max(0, $lineBasic - $lineDiscount);
+        $overallDiscount = $item->overall_discount_amount !== null
+            ? (float) $item->overall_discount_amount
+            : round($afterLineDiscount * $overallDiscountPct / 100, 2);
+        $lineTaxable = $item->taxable_amount !== null
+            ? (float) $item->taxable_amount
+            : ($item->total_amount !== null && $item->gst_amount !== null
+                ? max(0, (float) $item->total_amount - (float) $item->gst_amount)
+                : max(0, $afterLineDiscount - $overallDiscount));
+        $lineGst = $item->gst_amount !== null
+            ? (float) $item->gst_amount
+            : round($lineTaxable * (float) ($item->gst_percentage ?? $item->productDetails?->gst ?? 18) / 100, 2);
+
+        $basicTotal += $lineBasic;
+        $lineDiscountTotal += $lineDiscount;
+        $overallDiscountTotal += $overallDiscount;
+        $netTaxable += $lineTaxable;
+        $gstTotal += $lineGst;
     }
 
-    $grandTotal = $netTaxable + $freightCharges + $unloadingCharges + $gstTotal;
+    $rawGrand = $netTaxable + $freightCharges + $unloadingCharges + $gstTotal;
+    $roundDiff = $firstPo->roundoff !== null
+        ? (float) $firstPo->roundoff
+        : round(round($rawGrand) - $rawGrand, 2);
+    $grandTotal = round($rawGrand + $roundDiff, 2);
 
-    // Default company address
-    $companyName = "MERCURIIS STORAGE & EQUIPMENTS PVT LTD";
-    $companyBillingAddress = "89, Balaji Nagar, Athanancheri, Padappai, Chennai - 601301, Tamil Nadu, India.\nGSTIN: 33AATCM0824C1ZQ | Phone: +91 99620 55076 | Email: info@mercuriis.com";
+    // Company address based on Mercuriis Issuing Branch
+    $branchChoice = $firstPo->mercuriis_branch ?? 'Chennai';
+    $branchConfig = config('mercuriis_branches.branches.' . $branchChoice)
+        ?? config('mercuriis_branches.branches.' . config('mercuriis_branches.default', 'Chennai'));
+    $companyBillingAddress = $branchConfig['full_address'] ?? '';
+    $branchGstin = $branchConfig['gstin'] ?? '';
 
     // Shipping address determination
     $shippingAddress = $firstPo->shipping_address ?: $companyBillingAddress;
-    $shippingGst = $firstPo->shipping_gst ?: "33AATCM0824C1ZQ";
+    $shippingGst = $firstPo->shipping_gst ?: $branchGstin;
 
     $hideBrand = (bool)($firstPo->hide_brand_name);
 
@@ -424,8 +447,6 @@
         <tr>
             <td class="meta-label">Vendor Code:</td>
             <td class="meta-value">{{ $vendor?->vendor_id ?? 'VEN-' . str_pad($vendor?->id ?? 0, 4, '0', STR_PAD_LEFT) }}</td>
-            <td class="meta-label">Committed Lead Time:</td>
-            <td class="meta-value" style="color: #c2410c;">{{ $firstPo->lead_time ?: '4 Weeks' }}</td>
         </tr>
     </table>
 
@@ -454,20 +475,21 @@
             <!-- 2. BILLING ADDRESS (PURCHASER) -->
             <td>
                 <div class="address-box-title"><i class="fas fa-file-invoice"></i> Purchaser / Billing Address</div>
-                <strong>MERCURIIS STORAGE &amp; EQUIPMENTS PVT LTD</strong><br>
-                89, Balaji Nagar, Athanancheri,<br>
-                Padappai, Chennai - 601301,<br>
-                Tamil Nadu, India.<br>
-                <strong>GSTIN:</strong> 33AATCM0824C1ZQ<br>
-                <strong>Email:</strong> info@mercuriis.com
+                {!! nl2br(e($companyBillingAddress)) !!}
             </td>
 
             <!-- 3. SHIPPING / DELIVERY DESTINATION (MERCURIIS DISPLAYED) -->
             <td style="background: #fdfefe;">
                 <div class="address-box-title" style="color: #0369a1;"><i class="fas fa-truck"></i> Ship To / Delivery Destination</div>
-                <div style="font-weight: 800; font-size: 9pt; color: #1b5583; margin-bottom: 3px;">
-                    MERCURIIS STORAGE &amp; EQUIPMENTS PVT LTD
-                </div>
+                @if (($firstPo->shipping_type ?? 'warehouse') === 'warehouse')
+                    <div style="font-weight: 800; font-size: 9pt; color: #1b5583; margin-bottom: 3px;">
+                        MERCURIIS WAREHOUSE ({{ strtoupper($branchChoice) }})
+                    </div>
+                @else
+                    <div style="font-weight: 800; font-size: 9pt; color: #0284c7; margin-bottom: 3px;">
+                        DIRECT CUSTOMER SITE DELIVERY
+                    </div>
+                @endif
                 <div style="font-weight: 600; color: #0f172a;">
                     {!! nl2br(e($shippingAddress)) !!}
                 </div>
@@ -510,7 +532,7 @@
                 <tr>
                     <td style="text-align: center; font-weight: 600;">{{ $index + 1 }}</td>
                     <td style="text-align: center; font-weight: 700; color: #1b5583;">
-                        {{ $prod?->partno ?: ($prod?->sku ?: '-') }}
+                        {{ $item->part_no ?: ($prod?->partno ?: ($prod?->sku ?: '-')) }}
                     </td>
                     <td>
                         <strong style="color: #0f172a; font-size: 9pt;">{{ $prod?->productname ?? 'N/A' }}</strong>
@@ -519,6 +541,11 @@
                         @elseif (!empty($prod?->productdes))
                             <div style="font-size: 8pt; color: #475569; margin-top: 2px;">{{ $prod->productdes }}</div>
                         @endif
+                        @foreach ($item->accessories as $accessory)
+                            <div style="font-size: 7.5pt; color: #475569; margin-top: 2px;">
+                                Accessory: {{ $accessory->name }} × {{ $accessory->quantity }} (₹{{ number_format($accessory->total, 2) }})
+                            </div>
+                        @endforeach
                         @if ($specs->isNotEmpty())
                             <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">
                                 <em>Specs:</em>
@@ -528,7 +555,7 @@
                             </div>
                         @endif
                     </td>
-                    <td style="text-align: center;">{{ $prod?->hsn ?: '-' }}</td>
+                    <td style="text-align: center;">{{ $item->hsn_code ?: ($prod?->hsncode ?: ($prod?->hsn ?: '8428')) }}</td>
                     <td style="text-align: center; font-weight: 800; font-size: 9pt;">{{ $itemQty }}</td>
                     <td style="text-align: right;">{{ number_format($unitPrice, 2) }}</td>
                     <td style="text-align: right; font-weight: 700;">{{ number_format($lineBasic, 2) }}</td>
@@ -554,16 +581,22 @@
                 <td class="label">Gross Subtotal (Basic):</td>
                 <td style="text-align: right; font-weight: 700;">₹{{ number_format($basicTotal, 2) }}</td>
             </tr>
-            @if ($discountPct > 0 || $discountAmt > 0)
+            @if ($lineDiscountTotal > 0)
                 <tr>
-                    <td class="label" style="color: #b91c1c;">Less: Discount ({{ $discountPct }}%):</td>
-                    <td style="text-align: right; font-weight: 700; color: #b91c1c;">-₹{{ number_format($discountAmt, 2) }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Net Taxable Value:</td>
-                    <td style="text-align: right; font-weight: 700;">₹{{ number_format($netTaxable, 2) }}</td>
+                    <td class="label" style="color: #b91c1c;">Less: Line Discounts:</td>
+                    <td style="text-align: right; font-weight: 700; color: #b91c1c;">-₹{{ number_format($lineDiscountTotal, 2) }}</td>
                 </tr>
             @endif
+            @if ($overallDiscountTotal > 0)
+                <tr>
+                    <td class="label" style="color: #b91c1c;">Less: Overall Discount ({{ $discountPct }}%):</td>
+                    <td style="text-align: right; font-weight: 700; color: #b91c1c;">-₹{{ number_format($overallDiscountTotal, 2) }}</td>
+                </tr>
+            @endif
+            <tr>
+                <td class="label">Net Taxable Value:</td>
+                <td style="text-align: right; font-weight: 700;">₹{{ number_format($netTaxable, 2) }}</td>
+            </tr>
             @if ($freightCharges > 0)
                 <tr>
                     <td class="label">Freight / Transportation Charges:</td>
@@ -580,12 +613,30 @@
                 <td class="label">Total Applicable Tax (GST):</td>
                 <td style="text-align: right; font-weight: 700;">₹{{ number_format($gstTotal, 2) }}</td>
             </tr>
+            @if (abs($roundDiff) >= 0.005)
+                <tr>
+                    <td class="label">Round Off:</td>
+                    <td style="text-align: right; font-weight: 700;">{{ $roundDiff >= 0 ? '+' : '' }}₹{{ number_format($roundDiff, 2) }}</td>
+                </tr>
+            @endif
             <tr class="grand-row">
                 <td>GRAND TOTAL (INCL. GST):</td>
                 <td style="text-align: right;">₹{{ number_format($grandTotal, 2) }}</td>
             </tr>
         </table>
     </div>
+
+    @if (!empty($firstPo->technical_specification))
+        <!-- Technical Specifications & Parameters (Audio Requirement) -->
+        <div class="commercial-terms-box" style="margin-top: 6px; margin-bottom: 6px;">
+            <div style="font-weight: 800; color: #1b5583; font-size: 8.5pt; margin-bottom: 4px; text-transform: uppercase;">
+                Technical Specifications &amp; Fabrication Scope
+            </div>
+            <div style="font-size: 8.5pt; color: #1e293b; line-height: 1.45;">
+                {!! nl2br(e($firstPo->technical_specification)) !!}
+            </div>
+        </div>
+    @endif
 
     <!-- Commercial & Operational Terms -->
     <div class="commercial-terms-box">
@@ -599,6 +650,11 @@
             <div class="term-item">
                 <strong>• Payment Terms:</strong> {{ $firstPo->payment_terms ?: '50% Advance & Balance against Proforma' }}
             </div>
+            @if (!empty($firstPo->advance_percentage) && $firstPo->advance_percentage > 0)
+                <div class="term-item" style="color: #0369a1; font-weight: bold;">
+                    <strong>• Advance Required:</strong> {{ $firstPo->advance_percentage }}% (₹{{ number_format($firstPo->advance_amount, 2) }})
+                </div>
+            @endif
             <div class="term-item">
                 <strong>• Warranty Terms:</strong> {{ $firstPo->warranty_terms ?: '12 Months Standard Manufacturer Warranty' }}
             </div>
@@ -676,8 +732,8 @@
 
     <!-- Document Footer -->
     <div class="doc-footer">
-        <strong>Mercuriis Storage &amp; Equipments Pvt Ltd</strong> | 89, Balaji Nagar, Athanancheri, Padappai, Chennai - 601301, Tamil Nadu, India.<br>
-        GSTIN: 33AATCM0824C1ZQ | Corporate Website: www.mercuriis.com | Support: info@mercuriis.com
+        {{ str_replace("\n", ' | ', $companyBillingAddress) }}<br>
+        Corporate Website: www.mercuriis.com | Support: info@mercuriis.com
     </div>
 
 </div>
