@@ -1,2 +1,12 @@
 *
 !.gitignore
+!design/
+!design/**
+!designs/
+!designs/**
+!documents/
+!documents/**
+!drawings/
+!drawings/**
+!quotation-group-images/
+!quotation-group-images/**
